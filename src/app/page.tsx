@@ -150,9 +150,7 @@ export default function Home() {
 
       {/* ── Nav ── */}
       <header className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
-        <span className="text-lg font-semibold tracking-tight" style={{ color: SAGE }}>
-          ClearMyPlate
-        </span>
+        <img src="/images/Clear My Plate Logo Horizontal Lockup.svg" alt="ClearMyPlate" height="32" style={{ height: 32 }} />
         <Button
           variant="outline"
           size="sm"
@@ -546,7 +544,7 @@ export default function Home() {
       {/* ── Footer ── */}
       <footer className="mx-auto max-w-6xl px-6 py-10">
         <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
-          <span className="text-sm font-semibold" style={{ color: SAGE }}>ClearMyPlate</span>
+          <img src="/images/Clear My Plate Logo Horizontal Lockup.svg" alt="ClearMyPlate" height="24" style={{ height: 24 }} />
           <p className="text-xs" style={{ color: GRAY }}>
             © {new Date().getFullYear()} ClearMyPlate. Made for families.
           </p>

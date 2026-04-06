@@ -60,7 +60,7 @@ export default function Dashboard() {
         style={{ backgroundColor: "white", borderColor: BORDER }}
       >
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <span className="text-base font-semibold" style={{ color: SAGE }}>ClearMyPlate</span>
+          <img src="/images/Clear My Plate Logo Horizontal Lockup.svg" alt="ClearMyPlate" height="32" style={{ height: 32 }} />
           <div className="flex items-center gap-3">
             <span className="text-sm" style={{ color: GRAY }}>My Household</span>
             <div

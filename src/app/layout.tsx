@@ -7,6 +7,9 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 export const metadata: Metadata = {
   title: "ClearMyPlate",
   description: "Family meal planning made simple. Plan the week, clear the plate.",
+  icons: {
+    icon: "/images/CMP_Favicon.svg",
+  },
 };
 
 export default function RootLayout({

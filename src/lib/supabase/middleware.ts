@@ -23,8 +23,12 @@ export async function updateSession(request: NextRequest) {
     }
   )
 
-  // Refresh session if expired
-  await supabase.auth.getUser()
+  // Refresh session if expired — wrapped so a bad/missing key never 500s
+  try {
+    await supabase.auth.getUser()
+  } catch {
+    // Non-fatal: session refresh failed (e.g. key format mismatch), continue
+  }
 
   return supabaseResponse
 }

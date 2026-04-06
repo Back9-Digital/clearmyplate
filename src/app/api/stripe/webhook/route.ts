@@ -1,8 +1,27 @@
 import { NextRequest, NextResponse } from "next/server"
 import Stripe from "stripe"
-import { createClient } from "@/lib/supabase/server"
+import { createClient } from "@supabase/supabase-js"
+import { ghlTrackPayment } from "@/lib/ghl"
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2025-03-31.basil" })
+
+// Service-role client — can call auth.admin and bypasses RLS
+function adminClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+}
+
+function planTypeFromPriceId(priceId: string | null): string {
+  switch (priceId) {
+    case process.env.STRIPE_PRICE_FAMILY_MONTHLY: return "family"
+    case process.env.STRIPE_PRICE_FAMILY_ANNUAL:  return "family"
+    case process.env.STRIPE_PRICE_LIFETIME:        return "lifetime"
+    case process.env.STRIPE_PRICE_LAUNCH_SPECIAL:  return "launch_special"
+    default:                                        return "free"
+  }
+}
 
 export async function POST(req: NextRequest) {
   const body = await req.text()
@@ -16,63 +35,84 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 })
   }
 
-  const supabase = await createClient()
+  const supabase = adminClient()
 
   try {
     if (event.type === "checkout.session.completed") {
-      const session = event.data.object as Stripe.Checkout.Session
+      const session        = event.data.object as Stripe.Checkout.Session
+      const customerId     = session.customer as string | null
+      const subscriptionId = session.subscription as string | null
+      const customerEmail  = session.customer_details?.email ?? null
 
-      const customerId      = session.customer as string | null
-      const subscriptionId  = session.subscription as string | null
-      const customerEmail   = session.customer_details?.email ?? null
-
-      // Resolve user_id from email
-      let userId: string | null = null
-      if (customerEmail) {
-        const { data: users } = await supabase
-          .from("auth.users")
-          .select("id")
-          .eq("email", customerEmail)
-          .limit(1)
-        userId = users?.[0]?.id ?? null
+      if (!customerEmail) {
+        console.error("[webhook] checkout.session.completed: no customer email")
+        return NextResponse.json({ received: true })
       }
 
-      // Determine plan type from price
+      // Look up the auth user by email using the admin API
+      const { data: { users }, error: lookupError } = await supabase.auth.admin.listUsers()
+      if (lookupError) {
+        console.error("[webhook] Failed to list users:", lookupError)
+        return NextResponse.json({ received: true })
+      }
+      const user = users.find((u) => u.email === customerEmail) ?? null
+
+      if (!user) {
+        console.error("[webhook] No auth user found for email:", customerEmail)
+        return NextResponse.json({ received: true })
+      }
+
+      // Resolve price → plan type
       const lineItems = await stripe.checkout.sessions.listLineItems(session.id, { limit: 1 })
       const priceId   = lineItems.data[0]?.price?.id ?? null
-      let planType    = "unknown"
-      if (priceId === process.env.STRIPE_PRICE_FAMILY_MONTHLY)  planType = "family_monthly"
-      if (priceId === process.env.STRIPE_PRICE_FAMILY_ANNUAL)   planType = "family_annual"
-      if (priceId === process.env.STRIPE_PRICE_LIFETIME)        planType = "lifetime"
-      if (priceId === process.env.STRIPE_PRICE_LAUNCH_SPECIAL)  planType = "launch_special"
+      const planType  = planTypeFromPriceId(priceId)
 
-      // Resolve period end for subscriptions
+      // Resolve subscription period end
       let periodEnd: string | null = null
       if (subscriptionId) {
         const sub = await stripe.subscriptions.retrieve(subscriptionId) as unknown as { current_period_end: number }
         periodEnd = new Date(sub.current_period_end * 1000).toISOString()
       }
 
-      await supabase.from("user_subscriptions").upsert({
-        user_id:                  userId,
-        stripe_customer_id:       customerId,
-        stripe_subscription_id:   subscriptionId,
-        plan_type:                planType,
-        status:                   "active",
-        current_period_end:       periodEnd,
-      }, { onConflict: "stripe_customer_id" })
+      const { error: upsertError } = await supabase
+        .from("profiles")
+        .update({
+          plan_type:             planType,
+          stripe_customer_id:    customerId,
+        })
+        .eq("id", user.id)
+
+      if (upsertError) {
+        console.error("[webhook] Failed to update profile:", upsertError)
+      } else {
+        console.log(`[webhook] Updated profile for ${customerEmail} → ${planType}`)
+        // Non-blocking GHL contact update — failure never retries Stripe
+        await ghlTrackPayment(customerEmail, planType)
+      }
+
+      // Store subscription details separately if you need period tracking
+      if (periodEnd) {
+        console.log(`[webhook] Subscription period end: ${periodEnd}`)
+      }
     }
 
     if (event.type === "customer.subscription.deleted") {
-      const sub = event.data.object as Stripe.Subscription
-      await supabase
-        .from("user_subscriptions")
-        .update({ status: "cancelled", plan_type: "free" })
-        .eq("stripe_subscription_id", sub.id)
+      const sub        = event.data.object as Stripe.Subscription
+      const customerId = sub.customer as string
+
+      const { error } = await supabase
+        .from("profiles")
+        .update({ plan_type: "free" })
+        .eq("stripe_customer_id", customerId)
+
+      if (error) {
+        console.error("[webhook] Failed to downgrade profile:", error)
+      } else {
+        console.log(`[webhook] Downgraded customer ${customerId} to free`)
+      }
     }
   } catch (err) {
-    // Log but return 200 so Stripe doesn't retry indefinitely
-    console.error("[webhook] Handler error:", err)
+    console.error("[webhook] Unhandled error:", err)
   }
 
   return NextResponse.json({ received: true })

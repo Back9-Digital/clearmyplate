@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
 import Anthropic from "@anthropic-ai/sdk"
 import { createClient } from "@/lib/supabase/server"
+import {
+  generationsAllowed,
+  generationsRemaining,
+  weekNeedsReset,
+  getLastMondayMidnightUTC,
+} from "@/lib/generations"
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -27,12 +33,42 @@ function buildPortionGuidance(goal: string, householdTypes: string[]): string {
   return "Balanced, stress-free family meals. No restrictions, focus on variety and enjoyment."
 }
 
+type MealPref = { recipe_name: string; frequency: string }
+
+const FREQUENCY_LABELS: Record<string, string> = {
+  weekly:      "weekly",
+  fortnightly: "every 2 weeks",
+  monthly:     "once a month",
+  ai_choice:   "whenever it feels right",
+}
+
+function buildMealPrefsSection(prefs: MealPref[]): string {
+  if (!prefs.length) return ""
+  const lines = prefs.map(
+    (p) => `- ${p.recipe_name}: ${FREQUENCY_LABELS[p.frequency] ?? p.frequency}`
+  )
+  return `\nFAMILY MEAL PREFERENCES (respect these frequencies when building the plan):\n${lines.join("\n")}\n`
+}
+
 function buildPrompt(body: Record<string, unknown>): string {
   const {
     goal, adults, kids, meals_together, meals, units,
     will_eat, wont_eat, budget, use_leftovers,
     vegetarian_night, keep_simple, household_type,
+    meal_preferences,
+    calorie_target, macro_protein, macro_carbs, macro_fat,
   } = body
+
+  const mealPrefs: MealPref[] = Array.isArray(meal_preferences) ? meal_preferences : []
+
+  const macroSection = calorie_target
+    ? `\nCALORIE & MACRO TARGETS (per adult, per day — size portions to hit these):
+- Calories: ${calorie_target} kcal
+- Protein: ${macro_protein}% (~${Math.round((Number(calorie_target) * Number(macro_protein)) / 100 / 4)}g)
+- Carbs: ${macro_carbs}% (~${Math.round((Number(calorie_target) * Number(macro_carbs)) / 100 / 4)}g)
+- Fat: ${macro_fat}% (~${Math.round((Number(calorie_target) * Number(macro_fat)) / 100 / 9)}g)
+Include a brief per-meal note if a dish is particularly high or low in any macro.\n`
+    : ""`
 
   const householdTypes: string[] = Array.isArray(household_type) && household_type.length
     ? household_type
@@ -67,6 +103,7 @@ ${use_leftovers ? "- Include exactly ONE meal that uses leftovers from a previou
 ${vegetarian_night ? "- Include exactly ONE fully vegetarian dinner." : ""}
 ${keep_simple ? "- Keep meals simple: max 6 ingredients, under 30 min prep time." : ""}
 
+${buildMealPrefsSection(mealPrefs)}${macroSection}
 TONE RULES:
 - Never use restrictive or diet-culture language in meal names or descriptions
 - Frame portions as 'satisfying' and 'filling', never 'light' or 'diet'
@@ -103,16 +140,72 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
 
-    // Check API key is loaded
-    console.log("[generate] ANTHROPIC_API_KEY present:", !!process.env.ANTHROPIC_API_KEY)
-    console.log("[generate] ANTHROPIC_API_KEY prefix:", process.env.ANTHROPIC_API_KEY?.slice(0, 20))
+    // ── Auth + generation limit check ──────────────────────────
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 })
+    }
+
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("plan_type, generations_this_week, week_reset_at, calorie_target, macro_protein, macro_carbs, macro_fat")
+      .eq("id", user.id)
+      .single()
+
+    if (profileError || !profile) {
+      return NextResponse.json({ error: "Profile not found" }, { status: 500 })
+    }
+
+    // Reset weekly counter if we've crossed a Monday midnight NZT
+    let currentUsed = profile.generations_this_week
+    if (weekNeedsReset(profile.week_reset_at)) {
+      await supabase
+        .from("profiles")
+        .update({
+          generations_this_week: 0,
+          week_reset_at: getLastMondayMidnightUTC().toISOString(),
+        })
+        .eq("id", user.id)
+      currentUsed = 0
+    }
+
+    const limit = generationsAllowed(profile.plan_type)
+    const remaining = generationsRemaining(profile.plan_type, currentUsed)
+
+    if (remaining <= 0) {
+      return NextResponse.json(
+        {
+          error: "Generation limit reached",
+          limitReached: true,
+          planType: profile.plan_type,
+          limit,
+        },
+        { status: 403 }
+      )
+    }
+    // ───────────────────────────────────────────────────────────
+
+    // Fetch meal preferences to inject into prompt
+    const { data: mealPrefsData } = await supabase
+      .from("meal_preferences")
+      .select("recipe_name, frequency")
+      .eq("user_id", user.id)
 
     // Build and call AI
     const message = await anthropic.messages.create({
       model: "claude-sonnet-4-20250514",
       max_tokens: 4096,
       system: SYSTEM_PROMPT,
-      messages: [{ role: "user", content: buildPrompt(body) }],
+      messages: [{ role: "user", content: buildPrompt({
+        ...body,
+        meal_preferences: mealPrefsData ?? [],
+        calorie_target:   profile.calorie_target  ?? null,
+        macro_protein:    profile.macro_protein   ?? null,
+        macro_carbs:      profile.macro_carbs     ?? null,
+        macro_fat:        profile.macro_fat       ?? null,
+      }) }],
     })
 
     const raw = message.content[0].type === "text" ? message.content[0].text : ""
@@ -140,12 +233,15 @@ export async function POST(req: NextRequest) {
       parsed = JSON.parse(cleaned)
     }
 
-    // Attempt to save to Supabase — non-fatal if unauthenticated
+    // Build and call AI
+    await supabase
+      .from("profiles")
+      .update({ generations_this_week: currentUsed + 1 })
+      .eq("id", user.id)
+
+    // Attempt to save plan to Supabase — non-fatal if tables don't exist yet
     let savedPlanId: string | null = null
     try {
-      const supabase = await createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-
       if (user) {
         const { data: profile } = await supabase
           .from("household_profiles")

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import {
@@ -141,7 +141,11 @@ const pricingPlans: Plan[] = [
 
 const launchFeatures = ["Everything in Family Plan", "All future features", "Lifetime updates", "Early access"]
 
-async function startCheckout(planType: string, setLoading: (k: string | null) => void) {
+async function startCheckout(
+  planType: string,
+  setLoading: (k: string | null) => void,
+  onSoldOut?: () => void,
+) {
   setLoading(planType)
   try {
     const res = await fetch("/api/stripe/checkout", {
@@ -150,6 +154,10 @@ async function startCheckout(planType: string, setLoading: (k: string | null) =>
       body: JSON.stringify({ planType }),
     })
     const data = await res.json()
+    if (res.status === 409 && data.soldOut) {
+      onSoldOut?.()
+      return
+    }
     if (data.url) window.location.href = data.url
     else console.error("No checkout URL returned", data)
   } catch (err) {
@@ -160,9 +168,17 @@ async function startCheckout(planType: string, setLoading: (k: string | null) =>
 }
 
 export default function Home() {
-  const [annual, setAnnual]       = useState(false)
-  const [openFaq, setOpenFaq]     = useState<number | null>(null)
-  const [loadingPlan, setLoading] = useState<string | null>(null)
+  const [annual, setAnnual]             = useState(false)
+  const [openFaq, setOpenFaq]           = useState<number | null>(null)
+  const [loadingPlan, setLoading]       = useState<string | null>(null)
+  const [launchSoldOut, setLaunchSoldOut] = useState(false)
+
+  useEffect(() => {
+    fetch("/api/launch-special/count")
+      .then((r) => r.json())
+      .then((d) => { if (d.isSoldOut) setLaunchSoldOut(true) })
+      .catch(() => {/* non-fatal */})
+  }, [])
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: BG, color: DARK }}>
@@ -443,7 +459,7 @@ export default function Home() {
                 </ul>
 
                 {plan.name === "Try It Free" ? (
-                  <Link href="/onboard">
+                  <Link href="/signup">
                     <button
                       className="w-full rounded-full py-2 text-sm font-medium transition-all"
                       style={{ border: `1.5px solid ${SAGE}`, color: SAGE, backgroundColor: "transparent" }}
@@ -479,8 +495,8 @@ export default function Home() {
             ))}
           </div>
 
-          {/* ── Launch Special — full-width banner ── */}
-          <div
+          {/* ── Launch Special — full-width banner (hidden when sold out) ── */}
+          {!launchSoldOut && <div
             className="mt-5 flex flex-col gap-5 rounded-2xl p-6 sm:flex-row sm:items-center sm:gap-8"
             style={{ backgroundColor: "white", border: `2px dashed ${SAGE}` }}
           >
@@ -520,7 +536,7 @@ export default function Home() {
 
             {/* Right: CTA */}
             <button
-              onClick={() => startCheckout("launch_special", setLoading)}
+              onClick={() => startCheckout("launch_special", setLoading, () => setLaunchSoldOut(true))}
               disabled={loadingPlan !== null}
               className="shrink-0 w-full rounded-full px-7 py-2.5 text-sm font-semibold text-white transition-all hover:opacity-90 disabled:opacity-60 sm:w-auto"
               style={{ backgroundColor: SAGE }}
@@ -532,7 +548,7 @@ export default function Home() {
                 </span>
               ) : "Grab the deal →"}
             </button>
-          </div>
+          </div>}
         </div>
       </section>
 
@@ -575,7 +591,7 @@ export default function Home() {
           <p className="mt-4 text-sm text-white/70">
             Set up your household in under two minutes.
           </p>
-          <Link href="/onboard" className="inline-block mt-8">
+          <Link href="/signup" className="inline-block mt-8">
             <button
               className="rounded-full px-8 py-3 text-sm font-semibold transition-all hover:opacity-90"
               style={{ backgroundColor: "white", color: SAGE }}

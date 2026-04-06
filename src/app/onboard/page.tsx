@@ -1,8 +1,10 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { Check, ChevronLeft, Plus, Minus, Users, Zap, Leaf } from "lucide-react"
+import { createClient } from "@/lib/supabase/client"
 
 const SAGE     = "#4A7C6F"
 const BG       = "#F5F3EE"
@@ -112,9 +114,10 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
   )
 }
 
-function Counter({ label, value, onChange, min = 0 }: {
-  label: string; value: number; onChange: (v: number) => void; min?: number
+function Counter({ label, value, onChange, min = 0, max = Infinity }: {
+  label: string; value: number; onChange: (v: number) => void; min?: number; max?: number
 }) {
+  const atMax = value >= max
   return (
     <div className="flex items-center justify-between rounded-2xl bg-white px-5 py-4" style={{ border: `1px solid ${BORDER}` }}>
       <span className="font-medium text-sm" style={{ color: DARK }}>{label}</span>
@@ -128,9 +131,10 @@ function Counter({ label, value, onChange, min = 0 }: {
         </button>
         <span className="w-5 text-center font-semibold" style={{ color: DARK }}>{value}</span>
         <button
-          onClick={() => onChange(value + 1)}
-          className="flex h-8 w-8 items-center justify-center rounded-full text-white"
-          style={{ backgroundColor: SAGE }}
+          onClick={() => !atMax && onChange(value + 1)}
+          disabled={atMax}
+          className="flex h-8 w-8 items-center justify-center rounded-full text-white transition-opacity"
+          style={{ backgroundColor: atMax ? "#9CA3AF" : SAGE, cursor: atMax ? "not-allowed" : "pointer" }}
         >
           <Plus className="h-4 w-4" />
         </button>
@@ -143,10 +147,26 @@ function Counter({ label, value, onChange, min = 0 }: {
 
 export default function Onboard() {
   const router = useRouter()
-  const [step, setStep]     = useState(0)
-  const [data, setData]     = useState<FormData>(initialData)
+  const [step, setStep]       = useState(0)
+  const [data, setData]       = useState<FormData>(initialData)
   const [loading, setLoading] = useState(false)
-  const [error, setError]   = useState<string | null>(null)
+  const [error, setError]     = useState<string | null>(null)
+  const [planType, setPlanType] = useState<string>("free")
+
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return
+      supabase
+        .from("profiles")
+        .select("plan_type")
+        .eq("id", user.id)
+        .single()
+        .then(({ data: profile }) => {
+          if (profile?.plan_type) setPlanType(profile.plan_type)
+        })
+    })
+  }, [])
 
   const set = <K extends keyof FormData>(key: K, value: FormData[K]) =>
     setData((d) => ({ ...d, [key]: value }))
@@ -183,8 +203,20 @@ export default function Onboard() {
         body: JSON.stringify(payload),
       })
 
-      if (!res.ok) throw new Error("Server error")
       const result = await res.json()
+
+      if (res.status === 401) {
+        router.push("/signup?message=Please+create+a+free+account+to+generate+your+meal+plan")
+        return
+      }
+
+      if (res.status === 403 && result.limitReached) {
+        setError(`You've used all ${result.limit} generation${result.limit !== 1 ? "s" : ""} for this week. Resets every Monday. Upgrade for more.`)
+        setLoading(false)
+        return
+      }
+
+      if (!res.ok) throw new Error("Server error")
 
       // Stash the plan so /dashboard/plan can read it without auth
       if (typeof window !== "undefined") {
@@ -262,23 +294,55 @@ export default function Onboard() {
           )}
 
           {/* ── Step 2: Household ── */}
-          {step === 1 && (
-            <div>
-              <h2 className="mb-1 text-2xl font-bold" style={{ color: DARK }}>Who are you feeding?</h2>
-              <p className="mb-8 text-sm" style={{ color: GRAY }}>We&rsquo;ll size meals and grocery quantities to your household.</p>
-              <div className="space-y-3">
-                <Counter label="Adults" value={data.adults} onChange={(v) => set("adults", v)} min={1} />
-                <Counter label="Kids"   value={data.kids}   onChange={(v) => set("kids", v)} />
-                <div
-                  className="flex items-center justify-between rounded-2xl bg-white px-5 py-4"
-                  style={{ border: `1px solid ${BORDER}` }}
-                >
-                  <span className="text-sm font-medium" style={{ color: DARK }}>We usually eat dinner together</span>
-                  <Toggle checked={data.meals_together} onChange={(v) => set("meals_together", v)} />
+          {step === 1 && (() => {
+            const isFree    = planType === "free"
+            const atFreeCap = isFree && (data.adults >= 2 && data.kids >= 3)
+            // Free: max 2 adults, max 3 kids — Paid: max 4 adults, max 10 kids
+            const maxAdults = isFree ? 2  : 4
+            const maxKids   = isFree ? 3  : 10
+
+            return (
+              <div>
+                <h2 className="mb-1 text-2xl font-bold" style={{ color: DARK }}>Who are you feeding?</h2>
+                <p className="mb-8 text-sm" style={{ color: GRAY }}>We&rsquo;ll size meals and grocery quantities to your household.</p>
+                <div className="space-y-3">
+                  <Counter label="Adults" value={data.adults} onChange={(v) => set("adults", v)} min={1} max={maxAdults} />
+                  <Counter label="Kids"   value={data.kids}   onChange={(v) => set("kids", v)}   min={0} max={maxKids} />
+
+                  {/* Upgrade prompt when free user hits the cap */}
+                  {atFreeCap && (
+                    <div
+                      className="rounded-2xl px-5 py-4"
+                      style={{ backgroundColor: "#FEF3C7", border: "1px solid #FCD34D" }}
+                    >
+                      <p className="text-sm font-semibold" style={{ color: "#92400E" }}>
+                        Free plan: up to 2 adults + 3 kids
+                      </p>
+                      <p className="mt-0.5 text-xs" style={{ color: "#B45309" }}>
+                        Upgrade to plan for up to 14 people (4 adults + 10 kids).
+                      </p>
+                      <Link href="/#pricing">
+                        <button
+                          className="mt-3 rounded-full px-4 py-1.5 text-xs font-semibold text-white"
+                          style={{ backgroundColor: "#D97706" }}
+                        >
+                          See plans →
+                        </button>
+                      </Link>
+                    </div>
+                  )}
+
+                  <div
+                    className="flex items-center justify-between rounded-2xl bg-white px-5 py-4"
+                    style={{ border: `1px solid ${BORDER}` }}
+                  >
+                    <span className="text-sm font-medium" style={{ color: DARK }}>We usually eat dinner together</span>
+                    <Toggle checked={data.meals_together} onChange={(v) => set("meals_together", v)} />
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )
+          })()}
 
           {/* ── Step 3: Planning preferences ── */}
           {step === 2 && (

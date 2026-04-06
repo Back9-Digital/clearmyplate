@@ -281,6 +281,113 @@ function RecipeDrawer({
   )
 }
 
+// ── Frequency Modal ─────────────────────────────────────────
+type Frequency = "weekly" | "fortnightly" | "monthly" | "ai_choice"
+
+const FREQUENCY_OPTIONS: { value: Frequency; label: string; desc: string }[] = [
+  { value: "weekly",      label: "Weekly",                  desc: "In the plan every week"           },
+  { value: "fortnightly", label: "Every 2 weeks",           desc: "Alternate weeks"                  },
+  { value: "monthly",     label: "Once a month",            desc: "Once every four weeks or so"      },
+  { value: "ai_choice",   label: "Whenever AI feels like it", desc: "No preference — surprise us"   },
+]
+
+function FrequencyModal({
+  mealName,
+  onConfirm,
+  onClose,
+  saving,
+}: {
+  mealName: string
+  onConfirm: (frequency: Frequency) => void
+  onClose: () => void
+  saving: boolean
+}) {
+  const [selected, setSelected] = useState<Frequency>("weekly")
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ backgroundColor: "rgba(0,0,0,0.4)" }}
+    >
+      <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-xl" style={{ border: `1px solid ${BORDER}` }}>
+        <div className="mb-1 flex items-start justify-between">
+          <div className="flex-1 pr-4">
+            <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: SAGE }}>Saved</p>
+            <h3 className="font-bold text-lg leading-snug" style={{ color: DARK }}>{mealName}</h3>
+          </div>
+          <button
+            onClick={onClose}
+            className="shrink-0 rounded-full p-2"
+            style={{ backgroundColor: MUTED_BG }}
+          >
+            <X className="h-4 w-4" style={{ color: GRAY }} />
+          </button>
+        </div>
+        <p className="mt-1 mb-5 text-sm" style={{ color: GRAY }}>
+          How often would you like this in your meal plan?
+        </p>
+
+        <div className="space-y-2">
+          {FREQUENCY_OPTIONS.map((opt) => {
+            const active = selected === opt.value
+            return (
+              <button
+                key={opt.value}
+                onClick={() => setSelected(opt.value)}
+                className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left transition-all"
+                style={{
+                  border: `2px solid ${active ? SAGE : BORDER}`,
+                  backgroundColor: active ? ACCENT : "white",
+                  boxShadow: active ? `0 0 0 3px ${ACCENT}` : "none",
+                }}
+              >
+                <div
+                  className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2"
+                  style={{
+                    borderColor: active ? SAGE : BORDER,
+                    backgroundColor: active ? SAGE : "transparent",
+                  }}
+                >
+                  {active && <div className="h-1.5 w-1.5 rounded-full bg-white" />}
+                </div>
+                <div>
+                  <p className="text-sm font-medium" style={{ color: DARK }}>{opt.label}</p>
+                  <p className="text-xs" style={{ color: GRAY }}>{opt.desc}</p>
+                </div>
+              </button>
+            )
+          })}
+        </div>
+
+        <div className="mt-5 flex gap-3">
+          <button
+            onClick={() => onConfirm(selected)}
+            disabled={saving}
+            className="flex flex-1 items-center justify-center gap-2 rounded-full py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+            style={{ backgroundColor: SAGE }}
+          >
+            {saving ? (
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+            ) : (
+              <>
+                <Heart className="h-4 w-4" style={{ fill: "white" }} />
+                Save preference
+              </>
+            )}
+          </button>
+          <button
+            onClick={onClose}
+            className="rounded-full px-5 py-2.5 text-sm font-medium"
+            style={{ border: `1.5px solid ${BORDER}`, color: GRAY }}
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Regen Modal ─────────────────────────────────────────────
 function RegenModal({
   onClose,
@@ -356,6 +463,8 @@ export default function PlanPage() {
   const [regenLoading, setRegenLoading] = useState(false)
   const [error, setError]           = useState<string | null>(null)
   const [recipeFor, setRecipeFor]   = useState<Meal | null>(null)
+  const [pendingFavMeal, setPendingFavMeal] = useState<Meal | null>(null)
+  const [savingFreq, setSavingFreq] = useState(false)
 
   // Load plan on mount
   useEffect(() => {
@@ -411,14 +520,68 @@ export default function PlanPage() {
     load()
   }, [])
 
+  // Load saved meal preferences to populate heart state
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return
+      supabase
+        .from("meal_preferences")
+        .select("recipe_name")
+        .eq("user_id", user.id)
+        .then(({ data }) => {
+          if (data?.length) setFavourites(data.map((r) => r.recipe_name))
+        })
+    })
+  }, [])
+
   const toggleChecked = (name: string) => {
     setPlan((p) =>
       p ? { ...p, grocery_list: p.grocery_list.map((i) => i.name === name ? { ...i, checked: !i.checked } : i) } : p
     )
   }
 
-  const toggleFav = (mealName: string) => {
-    setFavourites((prev) => prev.includes(mealName) ? prev.filter((n) => n !== mealName) : [...prev, mealName])
+  const handleHeartClick = (meal: Meal) => {
+    if (favourites.includes(meal.meal_name)) {
+      // Unsave: remove from DB and local state
+      setFavourites((prev) => prev.filter((n) => n !== meal.meal_name))
+      const supabase = createClient()
+      supabase.auth.getUser().then(({ data: { user } }) => {
+        if (!user) return
+        supabase
+          .from("meal_preferences")
+          .delete()
+          .eq("user_id", user.id)
+          .eq("recipe_name", meal.meal_name)
+      })
+    } else {
+      // Open frequency modal
+      setPendingFavMeal(meal)
+    }
+  }
+
+  const handleFrequencyConfirm = async (frequency: Frequency) => {
+    if (!pendingFavMeal) return
+    setSavingFreq(true)
+    try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error("Not logged in")
+      const { error } = await supabase
+        .from("meal_preferences")
+        .upsert(
+          { user_id: user.id, recipe_name: pendingFavMeal.meal_name, frequency },
+          { onConflict: "user_id,recipe_name" }
+        )
+      if (error) throw error
+      setFavourites((prev) => [...prev, pendingFavMeal.meal_name])
+      setPendingFavMeal(null)
+    } catch {
+      // Non-fatal — still close the modal
+      setPendingFavMeal(null)
+    } finally {
+      setSavingFreq(false)
+    }
   }
 
   const handleRegen = async (instructions: string) => {
@@ -469,6 +632,15 @@ export default function PlanPage() {
         <RecipeDrawer
           meal={recipeFor}
           onClose={() => setRecipeFor(null)}
+        />
+      )}
+
+      {pendingFavMeal && (
+        <FrequencyModal
+          mealName={pendingFavMeal.meal_name}
+          onConfirm={handleFrequencyConfirm}
+          onClose={() => setPendingFavMeal(null)}
+          saving={savingFreq}
         />
       )}
 
@@ -595,7 +767,7 @@ export default function PlanPage() {
                           Swap
                         </button>
                         <button
-                          onClick={() => toggleFav(meal.meal_name)}
+                          onClick={() => handleHeartClick(meal)}
                           className="flex items-center gap-1 rounded-full px-3 py-2 text-xs font-medium transition-all"
                           style={
                             favourites.includes(meal.meal_name)

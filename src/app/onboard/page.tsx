@@ -209,7 +209,7 @@ export default function Onboard() {
 
         {/* Header */}
         <div className="mb-6 flex items-center justify-between">
-          <img src="/images/Clear My Plate Logo Horizontal Lockup.svg" alt="ClearMyPlate" height="28" style={{ height: 28 }} />
+          <img src="/images/Clear My Plate Logo Horizontal Lockup.svg" alt="ClearMyPlate" height="56" style={{ height: 56 }} />
           <span className="text-xs font-medium" style={{ color: GRAY }}>Step {step + 1} of {TOTAL_STEPS}</span>
         </div>
 

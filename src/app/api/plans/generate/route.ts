@@ -68,7 +68,7 @@ function buildPrompt(body: Record<string, unknown>): string {
 - Carbs: ${macro_carbs}% (~${Math.round((Number(calorie_target) * Number(macro_carbs)) / 100 / 4)}g)
 - Fat: ${macro_fat}% (~${Math.round((Number(calorie_target) * Number(macro_fat)) / 100 / 9)}g)
 Include a brief per-meal note if a dish is particularly high or low in any macro.\n`
-    : ""`
+    : ""
 
   const householdTypes: string[] = Array.isArray(household_type) && household_type.length
     ? household_type

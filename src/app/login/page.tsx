@@ -10,7 +10,6 @@ const BG     = "#F5F3EE"
 const BORDER = "#DDD9D1"
 const DARK   = "#1C2B27"
 const GRAY   = "#6B7B77"
-const ACCENT = "#D4E8E2"
 
 export default function LoginPage() {
   const router = useRouter()

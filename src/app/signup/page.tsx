@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { Suspense, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
@@ -11,10 +11,11 @@ const BORDER = "#DDD9D1"
 const DARK   = "#1C2B27"
 const GRAY   = "#6B7B77"
 
-export default function SignupPage() {
+function SignupForm() {
   const router       = useRouter()
   const searchParams = useSearchParams()
   const infoMessage  = searchParams.get("message")
+
   const [firstName, setFirstName] = useState("")
   const [email, setEmail]         = useState("")
   const [password, setPassword]   = useState("")
@@ -63,8 +64,6 @@ export default function SignupPage() {
     // Fire-and-forget GHL contact creation — profile is updated above before this fires
     fetch("/api/ghl/signup", { method: "POST" }).catch(() => {})
 
-    // If email confirmation is OFF in Supabase, the user is logged in immediately.
-    // If it's ON, show a message instead of redirecting.
     router.push("/onboard")
     router.refresh()
   }
@@ -191,5 +190,13 @@ export default function SignupPage() {
         </p>
       </div>
     </div>
+  )
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense>
+      <SignupForm />
+    </Suspense>
   )
 }

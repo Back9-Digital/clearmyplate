@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 import { ghlTrackSignup } from "@/lib/ghl"
 import { createClient } from "@/lib/supabase/server"
 
-export async function POST(req: NextRequest) {
+export async function POST() {
   // Verify the caller is an authenticated Supabase session (prevents abuse)
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()

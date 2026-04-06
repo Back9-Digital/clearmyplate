@@ -1,7 +1,7 @@
 import { Suspense } from "react"
 import Link from "next/link"
 import { redirect } from "next/navigation"
-import { Users, DollarSign, UtensilsCrossed, Target, ArrowRight, Zap } from "lucide-react"
+import { DollarSign, UtensilsCrossed, Target, ArrowRight, Zap } from "lucide-react"
 import { PaymentSuccessBanner } from "@/components/PaymentSuccessBanner"
 import { createClient } from "@/lib/supabase/server"
 import {

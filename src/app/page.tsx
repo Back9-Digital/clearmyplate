@@ -141,9 +141,28 @@ const pricingPlans: Plan[] = [
 
 const launchFeatures = ["Everything in Family Plan", "All future features", "Lifetime updates", "Early access"]
 
+async function startCheckout(planType: string, setLoading: (k: string | null) => void) {
+  setLoading(planType)
+  try {
+    const res = await fetch("/api/stripe/checkout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ planType }),
+    })
+    const data = await res.json()
+    if (data.url) window.location.href = data.url
+    else console.error("No checkout URL returned", data)
+  } catch (err) {
+    console.error("Checkout error", err)
+  } finally {
+    setLoading(null)
+  }
+}
+
 export default function Home() {
-  const [annual, setAnnual] = useState(false)
-  const [openFaq, setOpenFaq] = useState<number | null>(null)
+  const [annual, setAnnual]       = useState(false)
+  const [openFaq, setOpenFaq]     = useState<number | null>(null)
+  const [loadingPlan, setLoading] = useState<string | null>(null)
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: BG, color: DARK }}>
@@ -423,18 +442,39 @@ export default function Home() {
                   ))}
                 </ul>
 
-                <Link href="/onboard">
+                {plan.name === "Try It Free" ? (
+                  <Link href="/onboard">
+                    <button
+                      className="w-full rounded-full py-2 text-sm font-medium transition-all"
+                      style={{ border: `1.5px solid ${SAGE}`, color: SAGE, backgroundColor: "transparent" }}
+                    >
+                      {plan.cta}
+                    </button>
+                  </Link>
+                ) : (
                   <button
-                    className="w-full rounded-full py-2 text-sm font-medium transition-all"
+                    onClick={() => startCheckout(
+                      plan.name === "Family Plan"
+                        ? (annual ? "family_annual" : "family_monthly")
+                        : "lifetime",
+                      setLoading
+                    )}
+                    disabled={loadingPlan !== null}
+                    className="w-full rounded-full py-2 text-sm font-medium transition-all disabled:opacity-60"
                     style={
                       plan.highlight
                         ? { backgroundColor: "white", color: SAGE }
                         : { border: `1.5px solid ${SAGE}`, color: SAGE, backgroundColor: "transparent" }
                     }
                   >
-                    {plan.cta}
+                    {loadingPlan === (plan.name === "Family Plan" ? (annual ? "family_annual" : "family_monthly") : "lifetime") ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                        Loading…
+                      </span>
+                    ) : plan.cta}
                   </button>
-                </Link>
+                )}
               </div>
             ))}
           </div>
@@ -479,14 +519,19 @@ export default function Home() {
             </ul>
 
             {/* Right: CTA */}
-            <Link href="/onboard" className="shrink-0">
-              <button
-                className="w-full rounded-full px-7 py-2.5 text-sm font-semibold text-white transition-all sm:w-auto"
-                style={{ backgroundColor: SAGE }}
-              >
-                Grab the deal →
-              </button>
-            </Link>
+            <button
+              onClick={() => startCheckout("launch_special", setLoading)}
+              disabled={loadingPlan !== null}
+              className="shrink-0 w-full rounded-full px-7 py-2.5 text-sm font-semibold text-white transition-all hover:opacity-90 disabled:opacity-60 sm:w-auto"
+              style={{ backgroundColor: SAGE }}
+            >
+              {loadingPlan === "launch_special" ? (
+                <span className="flex items-center justify-center gap-2">
+                  <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  Loading…
+                </span>
+              ) : "Grab the deal →"}
+            </button>
           </div>
         </div>
       </section>

@@ -1,5 +1,9 @@
+"use client"
+
+import { Suspense } from "react"
 import Link from "next/link"
 import { Users, DollarSign, UtensilsCrossed, Target, ArrowRight } from "lucide-react"
+import { PaymentSuccessBanner } from "@/components/PaymentSuccessBanner"
 
 const SAGE = "#4A7C6F"
 const BG   = "#F5F3EE"
@@ -74,6 +78,11 @@ export default function Dashboard() {
       </header>
 
       <main className="mx-auto max-w-6xl px-6 py-10">
+
+        {/* Payment success banner */}
+        <Suspense fallback={null}>
+          <PaymentSuccessBanner />
+        </Suspense>
 
         {/* Greeting */}
         <div className="mb-8">

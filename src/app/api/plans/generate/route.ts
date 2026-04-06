@@ -103,6 +103,10 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
 
+    // Check API key is loaded
+    console.log("[generate] ANTHROPIC_API_KEY present:", !!process.env.ANTHROPIC_API_KEY)
+    console.log("[generate] ANTHROPIC_API_KEY prefix:", process.env.ANTHROPIC_API_KEY?.slice(0, 20))
+
     // Build and call AI
     const message = await anthropic.messages.create({
       model: "claude-sonnet-4-20250514",
@@ -225,9 +229,14 @@ export async function POST(req: NextRequest) {
       grocery_list: parsed.grocery_list,
     })
   } catch (err) {
-    console.error("Plan generation error:", err)
+    console.error("[generate] Plan generation error:", err)
+    if (err instanceof Error) {
+      console.error("[generate] Error name:", err.name)
+      console.error("[generate] Error message:", err.message)
+      console.error("[generate] Error stack:", err.stack)
+    }
     return NextResponse.json(
-      { error: "Failed to generate plan. Please try again." },
+      { error: "Failed to generate plan. Please try again.", detail: err instanceof Error ? err.message : String(err) },
       { status: 500 }
     )
   }

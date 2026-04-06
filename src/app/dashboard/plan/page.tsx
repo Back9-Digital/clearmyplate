@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { RefreshCw, Heart, ArrowLeft, Shuffle, X } from "lucide-react"
+import { RefreshCw, Heart, ArrowLeft, Shuffle, X, BookOpen, Clock, Users, ChevronRight } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 
 const SAGE     = "#4A7C6F"
@@ -34,6 +34,19 @@ type Plan = {
   grocery_list: GroceryItem[]
 }
 
+type RecipeIngredient = { name: string; quantity: string; notes?: string }
+
+type Recipe = {
+  meal_name: string
+  serves: number
+  prep_time_mins: number
+  cook_time_mins: number
+  ingredients: RecipeIngredient[]
+  steps: string[]
+  tips: string[]
+  storage: string
+}
+
 // ── Skeleton ────────────────────────────────────────────────
 function Skeleton() {
   return (
@@ -53,6 +66,218 @@ function Skeleton() {
         </div>
       ))}
     </div>
+  )
+}
+
+// ── Recipe skeleton ──────────────────────────────────────────
+function RecipeSkeleton() {
+  return (
+    <div className="animate-pulse space-y-6 p-6">
+      <div className="h-6 w-2/3 rounded-full" style={{ backgroundColor: MUTED_BG }} />
+      <div className="flex gap-4">
+        {[80, 90, 70].map((w, i) => (
+          <div key={i} className="h-5 rounded-full" style={{ backgroundColor: MUTED_BG, width: w }} />
+        ))}
+      </div>
+      <div className="space-y-2">
+        <div className="h-4 w-1/3 rounded-full" style={{ backgroundColor: MUTED_BG }} />
+        {[60, 80, 70, 65, 75].map((w, i) => (
+          <div key={i} className="h-4 rounded-full" style={{ backgroundColor: MUTED_BG, width: `${w}%` }} />
+        ))}
+      </div>
+      <div className="space-y-2">
+        <div className="h-4 w-1/3 rounded-full" style={{ backgroundColor: MUTED_BG }} />
+        {[90, 85, 80, 88, 75, 82].map((w, i) => (
+          <div key={i} className="h-4 rounded-full" style={{ backgroundColor: MUTED_BG, width: `${w}%` }} />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ── Recipe Drawer ────────────────────────────────────────────
+function RecipeDrawer({
+  meal,
+  onClose,
+}: {
+  meal: Meal
+  onClose: () => void
+}) {
+  const [recipe, setRecipe]   = useState<Recipe | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError]     = useState<string | null>(null)
+
+  useEffect(() => {
+    async function fetchRecipe() {
+      setLoading(true)
+      setError(null)
+      try {
+        const res = await fetch("/api/meals/recipe", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            meal_name: meal.meal_name,
+            description: meal.description,
+            key_ingredients: meal.key_ingredients,
+          }),
+        })
+        if (!res.ok) throw new Error("Failed to fetch recipe")
+        const data = await res.json()
+        setRecipe(data)
+      } catch {
+        setError("Couldn't load the recipe — please try again.")
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchRecipe()
+  }, [meal.meal_name])
+
+  // Prevent body scroll when open
+  useEffect(() => {
+    document.body.style.overflow = "hidden"
+    return () => { document.body.style.overflow = "" }
+  }, [])
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        className="fixed inset-0 z-40"
+        style={{ backgroundColor: "rgba(0,0,0,0.45)" }}
+        onClick={onClose}
+      />
+
+      {/* Drawer */}
+      <div
+        className="fixed bottom-0 left-0 right-0 z-50 flex flex-col rounded-t-3xl bg-white"
+        style={{ maxHeight: "90vh", boxShadow: "0 -4px 32px rgba(0,0,0,0.12)" }}
+      >
+        {/* Drag handle */}
+        <div className="flex justify-center pt-3 pb-1">
+          <div className="h-1 w-10 rounded-full" style={{ backgroundColor: BORDER }} />
+        </div>
+
+        {/* Header */}
+        <div className="flex items-start justify-between px-6 pb-4 pt-3" style={{ borderBottom: `1px solid ${BORDER}` }}>
+          <div className="flex-1 pr-4">
+            <p className="text-xs font-medium uppercase tracking-widest mb-1" style={{ color: SAGE }}>Recipe</p>
+            <h2 className="text-lg font-bold leading-snug" style={{ color: DARK }}>{meal.meal_name}</h2>
+          </div>
+          <button
+            onClick={onClose}
+            className="shrink-0 rounded-full p-2 transition-colors"
+            style={{ backgroundColor: MUTED_BG }}
+          >
+            <X className="h-4 w-4" style={{ color: GRAY }} />
+          </button>
+        </div>
+
+        {/* Scrollable body */}
+        <div className="flex-1 overflow-y-auto">
+          {loading ? (
+            <RecipeSkeleton />
+          ) : error ? (
+            <div className="flex flex-col items-center py-16 px-6 text-center">
+              <p className="text-sm" style={{ color: GRAY }}>{error}</p>
+              <button
+                onClick={() => { setLoading(true); setError(null) }}
+                className="mt-4 rounded-full px-5 py-2 text-sm font-medium text-white"
+                style={{ backgroundColor: SAGE }}
+              >
+                Try again
+              </button>
+            </div>
+          ) : recipe ? (
+            <div className="px-6 py-5 pb-10 space-y-7">
+
+              {/* Stats row */}
+              <div className="flex gap-5">
+                <div className="flex items-center gap-1.5">
+                  <Clock className="h-4 w-4 shrink-0" style={{ color: SAGE }} />
+                  <span className="text-sm" style={{ color: GRAY }}>
+                    {(recipe.prep_time_mins ?? 0) + (recipe.cook_time_mins ?? 0)} min total
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Clock className="h-4 w-4 shrink-0" style={{ color: SAGE }} />
+                  <span className="text-sm" style={{ color: GRAY }}>{recipe.prep_time_mins} min prep</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Users className="h-4 w-4 shrink-0" style={{ color: SAGE }} />
+                  <span className="text-sm" style={{ color: GRAY }}>Serves {recipe.serves}</span>
+                </div>
+              </div>
+
+              {/* Ingredients */}
+              <div>
+                <h3 className="mb-3 text-sm font-semibold uppercase tracking-widest" style={{ color: DARK }}>
+                  Ingredients
+                </h3>
+                <div className="rounded-2xl overflow-hidden" style={{ border: `1px solid ${BORDER}` }}>
+                  {recipe.ingredients.map((ing, i) => (
+                    <div
+                      key={i}
+                      className="flex items-baseline justify-between px-4 py-3"
+                      style={i > 0 ? { borderTop: `1px solid ${BORDER}` } : {}}
+                    >
+                      <div>
+                        <span className="text-sm font-medium" style={{ color: DARK }}>{ing.name}</span>
+                        {ing.notes && (
+                          <span className="ml-2 text-xs" style={{ color: GRAY }}>{ing.notes}</span>
+                        )}
+                      </div>
+                      <span className="ml-4 shrink-0 text-sm" style={{ color: GRAY }}>{ing.quantity}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Steps */}
+              <div>
+                <h3 className="mb-3 text-sm font-semibold uppercase tracking-widest" style={{ color: DARK }}>
+                  Method
+                </h3>
+                <ol className="space-y-4">
+                  {recipe.steps.map((step, i) => (
+                    <li key={i} className="flex gap-3">
+                      <span
+                        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white"
+                        style={{ backgroundColor: SAGE }}
+                      >
+                        {i + 1}
+                      </span>
+                      <p className="text-sm leading-relaxed pt-0.5" style={{ color: DARK }}>{step}</p>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+
+              {/* Tips */}
+              {recipe.tips && recipe.tips.length > 0 && (
+                <div className="rounded-2xl p-4 space-y-2" style={{ backgroundColor: ACCENT }}>
+                  <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: SAGE }}>Tips</p>
+                  {recipe.tips.map((tip, i) => (
+                    <div key={i} className="flex gap-2">
+                      <ChevronRight className="h-4 w-4 shrink-0 mt-0.5" style={{ color: SAGE }} />
+                      <p className="text-sm leading-relaxed" style={{ color: DARK }}>{tip}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Storage */}
+              {recipe.storage && (
+                <div className="rounded-2xl p-4" style={{ backgroundColor: MUTED_BG }}>
+                  <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: GRAY }}>Storage</p>
+                  <p className="text-sm leading-relaxed" style={{ color: DARK }}>{recipe.storage}</p>
+                </div>
+              )}
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </>
   )
 }
 
@@ -130,6 +355,7 @@ export default function PlanPage() {
   const [regenOpen, setRegenOpen]   = useState(false)
   const [regenLoading, setRegenLoading] = useState(false)
   const [error, setError]           = useState<string | null>(null)
+  const [recipeFor, setRecipeFor]   = useState<Meal | null>(null)
 
   // Load plan on mount
   useEffect(() => {
@@ -239,6 +465,13 @@ export default function PlanPage() {
         />
       )}
 
+      {recipeFor && (
+        <RecipeDrawer
+          meal={recipeFor}
+          onClose={() => setRecipeFor(null)}
+        />
+      )}
+
       {/* Header */}
       <header className="border-b bg-white" style={{ borderColor: BORDER }}>
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
@@ -345,9 +578,17 @@ export default function PlanPage() {
                       </div>
 
                       {/* Actions */}
-                      <div className="mt-3 flex items-center gap-2">
+                      <div className="mt-4 flex items-center gap-2">
                         <button
-                          className="flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium"
+                          onClick={() => setRecipeFor(meal)}
+                          className="flex flex-1 items-center justify-center gap-1.5 rounded-full py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90"
+                          style={{ backgroundColor: SAGE }}
+                        >
+                          <BookOpen className="h-3.5 w-3.5" />
+                          View Recipe
+                        </button>
+                        <button
+                          className="flex items-center gap-1 rounded-full px-3 py-2 text-xs font-medium"
                           style={{ border: `1px solid ${BORDER}`, color: GRAY }}
                         >
                           <Shuffle className="h-3 w-3" />
@@ -355,7 +596,7 @@ export default function PlanPage() {
                         </button>
                         <button
                           onClick={() => toggleFav(meal.meal_name)}
-                          className="flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium transition-all"
+                          className="flex items-center gap-1 rounded-full px-3 py-2 text-xs font-medium transition-all"
                           style={
                             favourites.includes(meal.meal_name)
                               ? { backgroundColor: ACCENT, color: SAGE }

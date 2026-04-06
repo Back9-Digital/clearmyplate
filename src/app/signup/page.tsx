@@ -61,8 +61,12 @@ function SignupForm() {
         .eq("id", data.user.id)
     }
 
-    // Fire-and-forget GHL contact creation — profile is updated above before this fires
-    fetch("/api/ghl/signup", { method: "POST" }).catch(() => {})
+    // Fire-and-forget GHL contact creation — pass firstName directly to avoid race condition
+    fetch("/api/ghl/signup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ firstName: firstName.trim() }),
+    }).catch(() => {})
 
     router.push("/onboard")
     router.refresh()

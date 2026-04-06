@@ -1,8 +1,8 @@
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import { ghlTrackSignup } from "@/lib/ghl"
 import { createClient } from "@/lib/supabase/server"
 
-export async function POST() {
+export async function POST(req: NextRequest) {
   // Verify the caller is an authenticated Supabase session (prevents abuse)
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -16,15 +16,12 @@ export async function POST() {
     return NextResponse.json({ error: "No email" }, { status: 400 })
   }
 
-  // Fetch full_name from profile (written by signup page before this fires)
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("full_name")
-    .eq("id", user.id)
-    .single()
+  // Read firstName from request body — passed directly from signup form to avoid
+  // a race condition where the profile DB write hasn't propagated before this reads it
+  const body = await req.json().catch(() => ({}))
+  const firstName: string | undefined = body.firstName || undefined
 
-  // Non-blocking — GHL failure never surfaces to the user
-  await ghlTrackSignup(email, profile?.full_name ?? undefined)
+  await ghlTrackSignup(email, firstName)
 
   return NextResponse.json({ ok: true })
 }

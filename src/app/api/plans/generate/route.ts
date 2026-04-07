@@ -7,6 +7,7 @@ import {
   weekNeedsReset,
   getLastMondayMidnightUTC,
 } from "@/lib/generations"
+import { ghlAddTags } from "@/lib/ghl"
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -233,11 +234,15 @@ export async function POST(req: NextRequest) {
       parsed = JSON.parse(cleaned)
     }
 
-    // Build and call AI
     await supabase
       .from("profiles")
       .update({ generations_this_week: currentUsed + 1 })
       .eq("id", user.id)
+
+    // Non-blocking GHL tag after successful generation
+    if (user.email) {
+      ghlAddTags(user.email, ["plan-generated"]).catch(() => {})
+    }
 
     // Attempt to save plan to Supabase — non-fatal if tables don't exist yet
     let savedPlanId: string | null = null

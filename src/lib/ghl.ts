@@ -56,10 +56,19 @@ export async function ghlTrackSignup(email: string, firstName?: string): Promise
     await upsertContact({
       email,
       firstName,
-      tags: ["clearmyplate", "clearmyplate-signup", "plan-free"],
+      tags: ["clearmyplate", "clearmyplate-signup", "plan-free", "welcome"],
     })
   } catch (err) {
     console.error("[ghl] signup upsert failed:", err)
+  }
+}
+
+/** Adds arbitrary tags to an existing (or new) GHL contact */
+export async function ghlAddTags(email: string, tags: string[]): Promise<void> {
+  try {
+    await upsertContact({ email, tags })
+  } catch (err) {
+    console.error("[ghl] addTags upsert failed:", err)
   }
 }
 

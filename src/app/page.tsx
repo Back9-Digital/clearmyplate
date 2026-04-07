@@ -204,7 +204,7 @@ export default function Home() {
 
           {/* Left */}
           <div>
-            <h1 className="text-balance text-5xl font-bold leading-tight tracking-tight lg:text-6xl">
+            <h1 className="text-balance text-4xl font-bold leading-tight tracking-tight sm:text-5xl lg:text-6xl">
               Clear what&rsquo;s on<br className="hidden sm:block" /> your plate.
             </h1>
             <p className="mt-5 max-w-lg text-lg leading-relaxed" style={{ color: GRAY }}>

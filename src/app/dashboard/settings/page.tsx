@@ -337,8 +337,8 @@ export default function SettingsPage() {
                 Dashboard
               </button>
             </Link>
-            <span style={{ color: BORDER }}>/</span>
-            <span className="text-sm font-medium" style={{ color: DARK }}>Settings</span>
+            <span className="hidden sm:inline" style={{ color: BORDER }}>/</span>
+            <span className="hidden sm:inline text-sm font-medium" style={{ color: DARK }}>Settings</span>
           </div>
           <span className="text-base font-semibold" style={{ color: SAGE }}>ClearMyPlate</span>
         </div>

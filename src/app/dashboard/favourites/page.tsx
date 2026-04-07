@@ -22,8 +22,8 @@ export default function FavouritesPage() {
                 Dashboard
               </button>
             </Link>
-            <span style={{ color: BORDER }}>/</span>
-            <span className="text-sm font-medium" style={{ color: DARK }}>Favourite Meals</span>
+            <span className="hidden sm:inline" style={{ color: BORDER }}>/</span>
+            <span className="hidden sm:inline text-sm font-medium" style={{ color: DARK }}>Favourite Meals</span>
           </div>
           <span className="text-base font-semibold" style={{ color: SAGE }}>ClearMyPlate</span>
         </div>

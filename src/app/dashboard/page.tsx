@@ -163,7 +163,7 @@ export default async function Dashboard() {
         {/* Free trial — active with generations remaining */}
         {hasFreePlansLeft && (
           <div
-            className="mb-6 flex items-center justify-between gap-4 rounded-2xl px-6 py-4"
+            className="mb-6 flex flex-col gap-3 rounded-2xl px-6 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
             style={{ backgroundColor: ACCENT_BG, border: `1px solid ${SAGE}20` }}
           >
             <div>
@@ -176,7 +176,7 @@ export default async function Dashboard() {
                   : `Free trial — ${trialDaysLeft} days remaining.`}
               </p>
             </div>
-            <Link href="/#pricing">
+            <Link href="/#pricing" className="self-start sm:self-auto">
               <button
                 className="shrink-0 rounded-full px-5 py-2 text-sm font-semibold text-white"
                 style={{ backgroundColor: SAGE }}
@@ -190,14 +190,14 @@ export default async function Dashboard() {
         {/* Free trial — all generations used (but trial not expired) */}
         {!isPaid && !trialExpired && remaining === 0 && (
           <div
-            className="mb-6 flex items-center justify-between gap-4 rounded-2xl px-6 py-4"
+            className="mb-6 flex flex-col gap-3 rounded-2xl px-6 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
             style={{ backgroundColor: "#FEF3C7", border: "1px solid #FCD34D" }}
           >
             <div>
               <p className="font-semibold text-sm" style={{ color: "#92400E" }}>You&rsquo;ve used both free meal plans</p>
               <p className="text-xs mt-0.5" style={{ color: "#B45309" }}>Upgrade to keep generating personalised plans for your family.</p>
             </div>
-            <Link href="/#pricing">
+            <Link href="/#pricing" className="self-start sm:self-auto">
               <button
                 className="shrink-0 rounded-full px-5 py-2 text-sm font-semibold text-white"
                 style={{ backgroundColor: "#D97706" }}
@@ -211,14 +211,14 @@ export default async function Dashboard() {
         {/* Free trial expired */}
         {trialExpired && (
           <div
-            className="mb-6 flex items-center justify-between gap-4 rounded-2xl px-6 py-4"
+            className="mb-6 flex flex-col gap-3 rounded-2xl px-6 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
             style={{ backgroundColor: "#FEE2E2", border: "1px solid #FECACA" }}
           >
             <div>
               <p className="font-semibold text-sm" style={{ color: "#B91C1C" }}>Your free trial has expired</p>
               <p className="text-xs mt-0.5" style={{ color: "#DC2626" }}>Upgrade to continue generating personalised meal plans.</p>
             </div>
-            <Link href="/#pricing">
+            <Link href="/#pricing" className="self-start sm:self-auto">
               <button
                 className="shrink-0 rounded-full px-5 py-2 text-sm font-semibold text-white"
                 style={{ backgroundColor: "#DC2626" }}

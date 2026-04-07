@@ -654,8 +654,8 @@ export default function PlanPage() {
                 Dashboard
               </button>
             </Link>
-            <span style={{ color: BORDER }}>/</span>
-            <span className="text-sm font-medium" style={{ color: DARK }}>Week of {weekLabel}</span>
+            <span className="hidden sm:inline" style={{ color: BORDER }}>/</span>
+            <span className="hidden sm:inline text-sm font-medium" style={{ color: DARK }}>Week of {weekLabel}</span>
           </div>
           <button
             onClick={() => setRegenOpen(true)}
@@ -663,7 +663,8 @@ export default function PlanPage() {
             style={{ backgroundColor: SAGE }}
           >
             <RefreshCw className="h-3.5 w-3.5" />
-            Regenerate
+            <span className="hidden sm:inline">Regenerate</span>
+            <span className="sm:hidden">Regen</span>
           </button>
         </div>
       </header>

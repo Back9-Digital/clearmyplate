@@ -5,7 +5,8 @@ import { DollarSign, UtensilsCrossed, Target, ArrowRight, Zap } from "lucide-rea
 import { PaymentSuccessBanner } from "@/components/PaymentSuccessBanner"
 import { PushNotificationToggle } from "@/components/PushNotificationToggle"
 import { LogoutButton } from "@/components/LogoutButton"
-import { createClient } from "@/lib/supabase/server"
+import { createClient as createServerClient } from "@/lib/supabase/server"
+import { createClient as createAdminClient } from "@supabase/supabase-js"
 import {
   generationsAllowed,
   generationsRemaining,
@@ -64,15 +65,25 @@ const cards = [
 ]
 
 export default async function Dashboard() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  // Auth: use the session-cookie client to verify identity
+  const authClient = await createServerClient()
+  const { data: { user } } = await authClient.auth.getUser()
   if (!user) redirect("/login")
 
-  const { data: profile } = await supabase
+  // Profile: use service-role client so we always read the row regardless of RLS policies
+  const adminSupabase = createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+  const { data: profile, error: profileError } = await adminSupabase
     .from("profiles")
     .select("plan_type, generations_this_week, week_reset_at, email, full_name, created_at")
     .eq("id", user.id)
     .single()
+
+  if (profileError) {
+    console.error("[dashboard] Failed to read profile:", profileError)
+  }
 
   const nztHour   = Number(new Intl.DateTimeFormat("en-NZ", { timeZone: "Pacific/Auckland", hour: "numeric", hour12: false }).format(new Date()))
   const timeOfDay = nztHour < 12 ? "Good morning" : nztHour < 17 ? "Good afternoon" : "Good evening"

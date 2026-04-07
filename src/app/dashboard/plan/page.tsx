@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { RefreshCw, Heart, ArrowLeft, Shuffle, X, BookOpen, Clock, Users, ChevronRight } from "lucide-react"
+import { useSearchParams } from "next/navigation"
+import { RefreshCw, Heart, ArrowLeft, Shuffle, X, BookOpen, Clock, Users, ChevronRight, Eye } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 
 const SAGE     = "#4A7C6F"
@@ -455,7 +456,12 @@ function RegenModal({
 
 // ── Page ────────────────────────────────────────────────────
 export default function PlanPage() {
-  const [activeTab, setActiveTab]   = useState<"plan" | "grocery">("plan")
+  const searchParams  = useSearchParams()
+  const ownerUserId   = searchParams.get("owner")   // set when member is viewing household plan
+  const tabParam      = searchParams.get("tab")
+  const viewOnly      = !!ownerUserId               // members are view-only
+
+  const [activeTab, setActiveTab]   = useState<"plan" | "grocery">(tabParam === "grocery" ? "grocery" : "plan")
   const [plan, setPlan]             = useState<Plan | null>(null)
   const [fetchLoading, setFetch]    = useState(true)
   const [favourites, setFavourites] = useState<string[]>([])
@@ -471,6 +477,16 @@ export default function PlanPage() {
     async function load() {
       setFetch(true)
       try {
+        // Member viewing household plan — fetch via API route (admin client)
+        if (ownerUserId) {
+          const res = await fetch(`/api/household/plan?owner=${ownerUserId}`)
+          if (res.ok) {
+            const { plan: fetchedPlan } = await res.json()
+            setPlan(fetchedPlan ?? null)
+          }
+          return
+        }
+
         // 1. Try Supabase for most recent plan
         const supabase = createClient()
         const { data: { user } } = await supabase.auth.getUser()
@@ -657,15 +673,25 @@ export default function PlanPage() {
             <span className="hidden sm:inline" style={{ color: BORDER }}>/</span>
             <span className="hidden sm:inline text-sm font-medium" style={{ color: DARK }}>Week of {weekLabel}</span>
           </div>
-          <button
-            onClick={() => setRegenOpen(true)}
-            className="flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium text-white"
-            style={{ backgroundColor: SAGE }}
-          >
-            <RefreshCw className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Regenerate</span>
-            <span className="sm:hidden">Regen</span>
-          </button>
+          {viewOnly ? (
+            <div
+              className="flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium"
+              style={{ backgroundColor: ACCENT, color: SAGE }}
+            >
+              <Eye className="h-3.5 w-3.5" />
+              View only
+            </div>
+          ) : (
+            <button
+              onClick={() => setRegenOpen(true)}
+              className="flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium text-white"
+              style={{ backgroundColor: SAGE }}
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Regenerate</span>
+              <span className="sm:hidden">Regen</span>
+            </button>
+          )}
         </div>
       </header>
 
@@ -695,12 +721,18 @@ export default function PlanPage() {
             {fetchLoading ? <Skeleton /> : !plan ? (
               <div className="flex flex-col items-center rounded-2xl bg-white py-20 text-center" style={{ border: `1px solid ${BORDER}` }}>
                 <p className="text-lg font-semibold mb-2" style={{ color: DARK }}>No plan yet</p>
-                <p className="text-sm mb-6" style={{ color: GRAY }}>Complete the onboarding to generate your first week.</p>
-                <Link href="/onboard">
-                  <button className="rounded-full px-6 py-2.5 text-sm font-semibold text-white" style={{ backgroundColor: SAGE }}>
-                    Create my plan →
-                  </button>
-                </Link>
+                {viewOnly ? (
+                  <p className="text-sm" style={{ color: GRAY }}>The household meal plan hasn&rsquo;t been generated yet.</p>
+                ) : (
+                  <>
+                    <p className="text-sm mb-6" style={{ color: GRAY }}>Complete the onboarding to generate your first week.</p>
+                    <Link href="/onboard">
+                      <button className="rounded-full px-6 py-2.5 text-sm font-semibold text-white" style={{ backgroundColor: SAGE }}>
+                        Create my plan →
+                      </button>
+                    </Link>
+                  </>
+                )}
               </div>
             ) : (
               <>
@@ -760,6 +792,7 @@ export default function PlanPage() {
                           <BookOpen className="h-3.5 w-3.5" />
                           View Recipe
                         </button>
+                        {!viewOnly && (
                         <button
                           className="flex items-center gap-1 rounded-full px-3 py-2 text-xs font-medium"
                           style={{ border: `1px solid ${BORDER}`, color: GRAY }}
@@ -767,6 +800,8 @@ export default function PlanPage() {
                           <Shuffle className="h-3 w-3" />
                           Swap
                         </button>
+                        )}
+                        {!viewOnly && (
                         <button
                           onClick={() => handleHeartClick(meal)}
                           className="flex items-center gap-1 rounded-full px-3 py-2 text-xs font-medium transition-all"
@@ -779,22 +814,25 @@ export default function PlanPage() {
                           <Heart className="h-3 w-3" style={favourites.includes(meal.meal_name) ? { fill: SAGE } : {}} />
                           {favourites.includes(meal.meal_name) ? "Saved" : "Save"}
                         </button>
+                        )}
                       </div>
                     </div>
                   ))}
                 </div>
 
-                {/* Regenerate all */}
-                <div className="mt-8 flex justify-center">
-                  <button
-                    onClick={() => setRegenOpen(true)}
-                    className="flex items-center gap-2 rounded-full px-7 py-3 text-sm font-medium text-white"
-                    style={{ backgroundColor: SAGE }}
-                  >
-                    <RefreshCw className="h-4 w-4" />
-                    Regenerate entire week
-                  </button>
-                </div>
+                {/* Regenerate all — owner only */}
+                {!viewOnly && (
+                  <div className="mt-8 flex justify-center">
+                    <button
+                      onClick={() => setRegenOpen(true)}
+                      className="flex items-center gap-2 rounded-full px-7 py-3 text-sm font-medium text-white"
+                      style={{ backgroundColor: SAGE }}
+                    >
+                      <RefreshCw className="h-4 w-4" />
+                      Regenerate entire week
+                    </button>
+                  </div>
+                )}
               </>
             )}
           </>

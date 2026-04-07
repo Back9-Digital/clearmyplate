@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic"
 import { Suspense } from "react"
 import Link from "next/link"
 import { redirect } from "next/navigation"
-import { DollarSign, UtensilsCrossed, Target, ArrowRight, Zap } from "lucide-react"
+import { DollarSign, UtensilsCrossed, Target, ArrowRight, Zap, Users } from "lucide-react"
 import { PaymentSuccessBanner } from "@/components/PaymentSuccessBanner"
 import { PushNotificationToggle } from "@/components/PushNotificationToggle"
 import { LogoutButton } from "@/components/LogoutButton"
@@ -70,6 +70,26 @@ export default async function Dashboard() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect("/login")
 
+  // Check if this user is a member of someone else's household
+  const { data: membership } = await supabase
+    .from("household_members")
+    .select("household_id")
+    .eq("member_id", user.id)
+    .maybeSingle()
+
+  const ownerUserId = membership?.household_id ?? null
+
+  // If member, fetch the owner's profile for their name
+  let ownerName: string | null = null
+  if (ownerUserId) {
+    const { data: ownerProfile } = await supabase
+      .from("profiles")
+      .select("full_name, email")
+      .eq("id", ownerUserId)
+      .maybeSingle()
+    ownerName = ownerProfile?.full_name ?? ownerProfile?.email ?? null
+  }
+
   const { data: profile } = await supabase
     .from("profiles")
     .select("plan_type, generations_this_week, week_reset_at, email, full_name, created_at")
@@ -129,6 +149,103 @@ export default async function Dashboard() {
     },
   ]
 
+  // ── Member dashboard (view-only) ──────────────────────────────
+  if (ownerUserId) {
+    const memberInitial = (fullName ?? profile?.email ?? user.email ?? "?")[0].toUpperCase()
+    const memberCards = [
+      {
+        title: "This Week's Plan",
+        description: "View your household's 7-day dinner plan.",
+        cta: "View Meal Plan",
+        href: `/dashboard/plan?owner=${ownerUserId}`,
+        primary: true,
+      },
+      {
+        title: "Grocery List",
+        description: "Your household's shopping list for this week.",
+        cta: "View Shopping List",
+        href: `/dashboard/plan?tab=grocery&owner=${ownerUserId}`,
+        primary: true,
+      },
+    ]
+
+    return (
+      <div className="min-h-screen" style={{ backgroundColor: BG }}>
+        <header className="border-b" style={{ backgroundColor: "white", borderColor: BORDER }}>
+          <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+            <img src="/images/Clear My Plate Logo Horizontal Lockup.svg" alt="ClearMyPlate" height="56" style={{ height: 56 }} />
+            <div className="flex items-center gap-3">
+              <PushNotificationToggle />
+              <span className="text-sm hidden sm:inline" style={{ color: GRAY }}>{user.email}</span>
+              <div
+                className="flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold text-white"
+                style={{ backgroundColor: SAGE }}
+              >
+                {memberInitial}
+              </div>
+              <LogoutButton />
+            </div>
+          </div>
+        </header>
+
+        <main className="mx-auto max-w-6xl px-6 py-10">
+          {/* Greeting */}
+          <div className="mb-6">
+            <h1 className="text-2xl font-bold" style={{ color: DARK }}>{greeting} 👋</h1>
+            <p className="mt-1 text-sm" style={{ color: GRAY }}>Here&rsquo;s your household overview.</p>
+          </div>
+
+          {/* Household member banner */}
+          <div
+            className="mb-8 flex items-center gap-3 rounded-2xl px-5 py-4"
+            style={{ backgroundColor: ACCENT_BG, border: `1px solid ${SAGE}30` }}
+          >
+            <div
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
+              style={{ backgroundColor: "white" }}
+            >
+              <Users className="h-4 w-4" style={{ color: SAGE }} />
+            </div>
+            <div>
+              <p className="text-sm font-semibold" style={{ color: DARK }}>
+                {ownerName ? `You're part of ${ownerName}'s household` : "You're part of a shared household"}
+              </p>
+              <p className="text-xs mt-0.5" style={{ color: GRAY }}>
+                You can view and shop from the shared meal plan below.
+              </p>
+            </div>
+          </div>
+
+          {/* Member cards */}
+          <div className="grid gap-5 sm:grid-cols-2">
+            {memberCards.map((card) => (
+              <div
+                key={card.title}
+                className="flex flex-col rounded-2xl bg-white p-6"
+                style={{ border: `1px solid ${BORDER}` }}
+              >
+                <h2 className="mb-1 font-semibold" style={{ color: DARK }}>{card.title}</h2>
+                <p className="mb-5 flex-1 text-sm leading-relaxed" style={{ color: GRAY }}>
+                  {card.description}
+                </p>
+                <Link href={card.href}>
+                  <button
+                    className="flex items-center gap-1.5 rounded-full px-5 py-2 text-sm font-medium transition-all"
+                    style={{ backgroundColor: SAGE, color: "white" }}
+                  >
+                    {card.cta}
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </button>
+                </Link>
+              </div>
+            ))}
+          </div>
+        </main>
+      </div>
+    )
+  }
+
+  // ── Owner dashboard (full) ─────────────────────────────────
   return (
     <div className="min-h-screen" style={{ backgroundColor: BG }}>
 

@@ -49,13 +49,12 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ received: true })
       }
 
-      // Look up the auth user by email using the admin API
-      const { data: { users }, error: lookupError } = await supabase.auth.admin.listUsers()
+      // Look up the auth user by email — use getUserByEmail to avoid listUsers() pagination limits
+      const { data: { user }, error: lookupError } = await supabase.auth.admin.getUserByEmail(customerEmail)
       if (lookupError) {
-        console.error("[webhook] Failed to list users:", lookupError)
+        console.error("[webhook] Failed to look up user by email:", lookupError)
         return NextResponse.json({ received: true })
       }
-      const user = users.find((u) => u.email === customerEmail) ?? null
 
       if (!user) {
         console.error("[webhook] No auth user found for email:", customerEmail)

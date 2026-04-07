@@ -68,11 +68,16 @@ export default async function Dashboard() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect("/login")
 
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select("plan_type, generations_this_week, week_reset_at, email, full_name, created_at")
     .eq("id", user.id)
     .single()
+
+  // Diagnostic — remove once resolved
+  console.log("[dashboard:profile] user.id =", user.id)
+  console.log("[dashboard:profile] data =", JSON.stringify(profile))
+  console.log("[dashboard:profile] error =", profileError ? JSON.stringify(profileError) : "none")
 
   const nztHour   = Number(new Intl.DateTimeFormat("en-NZ", { timeZone: "Pacific/Auckland", hour: "numeric", hour12: false }).format(new Date()))
   const timeOfDay = nztHour < 12 ? "Good morning" : nztHour < 17 ? "Good afternoon" : "Good evening"

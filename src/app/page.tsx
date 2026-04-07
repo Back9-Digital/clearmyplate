@@ -186,14 +186,16 @@ export default function Home() {
       {/* ── Nav ── */}
       <header className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
         <img src="/images/Clear My Plate Logo Horizontal Lockup.svg" alt="ClearMyPlate" height="56" style={{ height: 56 }} />
-        <Button
-          variant="outline"
-          size="sm"
-          className="rounded-full bg-transparent text-sm"
-          style={{ borderColor: BORDER, color: DARK }}
-        >
-          Sign in
-        </Button>
+        <Link href="/login">
+          <Button
+            variant="outline"
+            size="sm"
+            className="rounded-full bg-transparent text-sm"
+            style={{ borderColor: BORDER, color: DARK }}
+          >
+            Sign in
+          </Button>
+        </Link>
       </header>
 
       {/* ── Hero ── */}

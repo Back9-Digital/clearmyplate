@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { ArrowLeft, Plus, Minus, Check, Save, ExternalLink } from "lucide-react"
+import { ArrowLeft, Plus, Minus, Check, Save, ExternalLink, Mail, UserPlus, X as XIcon } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import {
   generationsAllowed,
@@ -174,6 +174,14 @@ export default function SettingsPage() {
   const [saving, setSaving]   = useState(false)
   const [loading, setLoading] = useState(true)
 
+  // Invites
+  type Invite = { id: string; email: string; created_at: string }
+  const [invites, setInvites]           = useState<Invite[]>([])
+  const [inviteEmail, setInviteEmail]   = useState("")
+  const [inviteSending, setInviteSending] = useState(false)
+  const [inviteError, setInviteError]   = useState<string | null>(null)
+  const [inviteSuccess, setInviteSuccess] = useState(false)
+
   // Load profile on mount
   useEffect(() => {
     const supabase = createClient()
@@ -220,6 +228,54 @@ export default function SettingsPage() {
         })
     })
   }, [])
+
+  // Load pending invites
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return
+      supabase
+        .from("household_invites")
+        .select("id, email, created_at")
+        .eq("household_id", user.id)
+        .is("accepted_at", null)
+        .order("created_at", { ascending: false })
+        .then(({ data }) => { if (data) setInvites(data) })
+    })
+  }, [])
+
+  // ── Invite helpers ───────────────────────────────────────────
+  const handleSendInvite = async () => {
+    if (!inviteEmail.trim()) return
+    setInviteSending(true)
+    setInviteError(null)
+    try {
+      const res = await fetch("/api/invite/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: inviteEmail.trim() }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? "Failed to send invite")
+      setInvites((prev) => [data.invite, ...prev])
+      setInviteEmail("")
+      setInviteSuccess(true)
+      setTimeout(() => setInviteSuccess(false), 3000)
+    } catch (err) {
+      setInviteError(err instanceof Error ? err.message : "Failed to send invite")
+    } finally {
+      setInviteSending(false)
+    }
+  }
+
+  const handleCancelInvite = async (id: string) => {
+    const res = await fetch("/api/invite/cancel", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    })
+    if (res.ok) setInvites((prev) => prev.filter((i) => i.id !== id))
+  }
 
   // ── Family member helpers ────────────────────────────────────
   const handleAdultsChange = (v: number) => {
@@ -755,6 +811,84 @@ export default function SettingsPage() {
                   </p>
                 )}
               </div>
+            </div>
+          </section>
+
+          <div className="h-px" style={{ backgroundColor: BORDER }} />
+
+          {/* ── Invite Family Members ── */}
+          <section>
+            <SectionHeading
+              title="Invite Family Members"
+              description="Invite someone to view your meal plan and tick off grocery items."
+            />
+            <div className="space-y-3">
+
+              {/* Email input + button */}
+              <div className="flex gap-3">
+                <div
+                  className="flex flex-1 items-center gap-2 rounded-2xl bg-white px-4 py-3"
+                  style={{ border: `1.5px solid ${BORDER}` }}
+                >
+                  <Mail className="h-4 w-4 shrink-0" style={{ color: GRAY }} />
+                  <input
+                    type="email"
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleSendInvite()}
+                    placeholder="family@example.com"
+                    className="flex-1 bg-transparent text-sm outline-none"
+                    style={{ color: DARK }}
+                  />
+                </div>
+                <button
+                  onClick={handleSendInvite}
+                  disabled={inviteSending || !inviteEmail.trim()}
+                  className="flex shrink-0 items-center gap-1.5 rounded-full px-5 py-2.5 text-sm font-semibold text-white transition-all disabled:opacity-50"
+                  style={{ backgroundColor: SAGE }}
+                >
+                  <UserPlus className="h-4 w-4" />
+                  {inviteSending ? "Sending…" : "Invite"}
+                </button>
+              </div>
+
+              {inviteSuccess && (
+                <p className="text-sm font-medium" style={{ color: SAGE }}>Invite sent!</p>
+              )}
+              {inviteError && (
+                <p className="text-sm" style={{ color: "#B91C1C" }}>{inviteError}</p>
+              )}
+
+              {/* Pending invites list */}
+              {invites.length > 0 && (
+                <div className="space-y-2 pt-1">
+                  <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: GRAY }}>
+                    Pending invites
+                  </p>
+                  {invites.map((invite) => (
+                    <div
+                      key={invite.id}
+                      className="flex items-center justify-between rounded-2xl bg-white px-4 py-3"
+                      style={{ border: `1px solid ${BORDER}` }}
+                    >
+                      <div>
+                        <p className="text-sm font-medium" style={{ color: DARK }}>{invite.email}</p>
+                        <p className="text-xs" style={{ color: GRAY }}>
+                          Sent {new Date(invite.created_at).toLocaleDateString("en-NZ", { day: "numeric", month: "short" })}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => handleCancelInvite(invite.id)}
+                        className="rounded-full p-1.5 transition-colors"
+                        style={{ color: GRAY }}
+                        title="Cancel invite"
+                      >
+                        <XIcon className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </section>
 

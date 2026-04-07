@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { ghlTrackSignup } from "@/lib/ghl"
 import { createClient } from "@/lib/supabase/server"
 
+export const dynamic = "force-dynamic"
+
 export async function POST(req: NextRequest) {
   // Verify the caller is an authenticated Supabase session (prevents abuse)
   const supabase = await createClient()

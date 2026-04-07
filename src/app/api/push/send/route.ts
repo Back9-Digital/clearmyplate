@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { sendPushToUser } from "@/lib/push"
 
+export const dynamic = "force-dynamic"
+
 // Internal route — only callable by authenticated users (admin use)
 // For server-side triggers, call sendPushToUser() directly from lib/push.ts
 

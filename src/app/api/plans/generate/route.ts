@@ -171,19 +171,20 @@ export async function POST(req: NextRequest) {
 
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
-      .select("plan_type, generations_this_week, week_reset_at, calorie_target, macro_protein, macro_carbs, macro_fat, family_members, allergies, created_at")
+      .select("plan_type, generations_this_week, week_reset_at, calorie_target, macro_protein, macro_carbs, macro_fat, family_members, allergies")
       .eq("id", user.id)
       .single()
 
     if (profileError || !profile) {
-      return NextResponse.json({ error: "Profile not found" }, { status: 500 })
+      console.error("[generate] Profile fetch failed:", profileError)
+      return NextResponse.json({ error: "Profile not found", detail: profileError?.message }, { status: 500 })
     }
 
     const planType = profile.plan_type ?? "free"
 
-    // ── Free trial expiry check ────────────────────────────────
+    // ── Free trial expiry check — use auth user.created_at (always present) ──
     if (!isPaidPlan(planType)) {
-      const daysLeft = trialDaysRemaining(profile.created_at ?? new Date().toISOString())
+      const daysLeft = trialDaysRemaining(user.created_at ?? new Date().toISOString())
       if (daysLeft <= 0) {
         return NextResponse.json(
           { error: "Your free trial has expired. Upgrade to continue.", trialExpired: true },

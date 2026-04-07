@@ -241,7 +241,10 @@ export default function Onboard() {
         return
       }
 
-      if (!res.ok) throw new Error("Server error")
+      if (!res.ok) {
+        const errMsg = result?.detail || result?.error || "Server error"
+        throw new Error(errMsg)
+      }
 
       // Stash the plan so /dashboard/plan can read it without auth
       if (typeof window !== "undefined") {
@@ -252,8 +255,10 @@ export default function Onboard() {
       }
 
       router.push("/dashboard/plan")
-    } catch {
-      setError("Something went wrong — please try again.")
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Something went wrong"
+      console.error("[onboard/generate]", msg)
+      setError(msg.length < 200 ? msg : "Something went wrong — please try again.")
       setLoading(false)
     }
   }

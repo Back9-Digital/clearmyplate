@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, Suspense } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { RefreshCw, Heart, ArrowLeft, Shuffle, X, BookOpen, Clock, Users, ChevronRight, Eye } from "lucide-react"
@@ -455,7 +455,7 @@ function RegenModal({
 }
 
 // ── Page ────────────────────────────────────────────────────
-export default function PlanPage() {
+function PlanPageInner() {
   const searchParams  = useSearchParams()
   const ownerUserId   = searchParams.get("owner")   // set when member is viewing household plan
   const tabParam      = searchParams.get("tab")
@@ -929,5 +929,13 @@ export default function PlanPage() {
         )}
       </div>
     </div>
+  )
+}
+
+export default function PlanPage() {
+  return (
+    <Suspense fallback={null}>
+      <PlanPageInner />
+    </Suspense>
   )
 }

@@ -6,6 +6,17 @@ export const dynamic = "force-dynamic"
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2025-03-31.basil" })
 
+const ALLOWED_ORIGINS = [
+  "https://www.clearmyplate.app",
+  "https://clearmyplate.app",
+  "http://localhost:3000",
+]
+
+function safeOrigin(req: NextRequest): string {
+  const origin = req.headers.get("origin") ?? ""
+  return ALLOWED_ORIGINS.includes(origin) ? origin : "https://www.clearmyplate.app"
+}
+
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -14,7 +25,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthenticated" }, { status: 401 })
   }
 
-  const origin = req.headers.get("origin") ?? "https://www.clearmyplate.app"
+  const origin = safeOrigin(req)
 
   const customers = await stripe.customers.list({ email: user.email, limit: 1 })
   if (!customers.data.length) {

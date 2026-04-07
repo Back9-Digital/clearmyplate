@@ -8,6 +8,13 @@ const SYSTEM_PROMPT = `You are ClearMyPlate, a practical NZ family meal planning
 
 export async function POST(req: NextRequest) {
   try {
+    // Auth required — endpoint calls Anthropic API which costs money
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 })
+    }
+
     const { meal_name, description, key_ingredients, adults = 2, kids = 0, goal = "maintain" } = await req.json()
 
     if (!meal_name) {
@@ -16,7 +23,6 @@ export async function POST(req: NextRequest) {
 
     // Check cache in Supabase first
     try {
-      const supabase = await createClient()
       const { data: cached } = await supabase
         .from("meal_recipes")
         .select("recipe_json")
@@ -82,7 +88,6 @@ Respond with exactly this JSON structure:
 
     // Save to cache (non-fatal)
     try {
-      const supabase = await createClient()
       await supabase.from("meal_recipes").insert({ meal_name, recipe_json: recipe })
     } catch {
       // Cache save failed — still return recipe
@@ -91,9 +96,7 @@ Respond with exactly this JSON structure:
     return NextResponse.json(recipe)
   } catch (err) {
     console.error("[recipe] Error:", err)
-    return NextResponse.json(
-      { error: "Failed to generate recipe.", detail: err instanceof Error ? err.message : String(err) },
-      { status: 500 }
-    )
+    // Do not leak internal error details to the client
+    return NextResponse.json({ error: "Failed to generate recipe." }, { status: 500 })
   }
 }

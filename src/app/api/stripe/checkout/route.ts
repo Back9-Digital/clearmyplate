@@ -1,8 +1,20 @@
 import { NextRequest, NextResponse } from "next/server"
 import Stripe from "stripe"
 import { createClient } from "@supabase/supabase-js"
+import { createClient as createServerClient } from "@/lib/supabase/server"
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2025-03-31.basil" })
+
+const ALLOWED_ORIGINS = [
+  "https://www.clearmyplate.app",
+  "https://clearmyplate.app",
+  "http://localhost:3000",
+]
+
+function safeOrigin(req: NextRequest): string {
+  const origin = req.headers.get("origin") ?? ""
+  return ALLOWED_ORIGINS.includes(origin) ? origin : "https://www.clearmyplate.app"
+}
 
 const LAUNCH_SPECIAL_CAP = 100
 
@@ -27,6 +39,13 @@ const PRICE_MAP: Record<string, string | undefined> = {
 
 export async function POST(req: NextRequest) {
   try {
+    // Require authentication — prevents anonymous checkout session spam
+    const supabase = await createServerClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      return NextResponse.json({ error: "Unauthenticated" }, { status: 401 })
+    }
+
     const { planType } = await req.json()
 
     const priceId = PRICE_MAP[planType]
@@ -43,7 +62,7 @@ export async function POST(req: NextRequest) {
     }
 
     const isOneTime = planType === "lifetime" || planType === "launch_special"
-    const origin = req.headers.get("origin") ?? "http://localhost:3000"
+    const origin = safeOrigin(req)
 
     const session = await stripe.checkout.sessions.create({
       mode: isOneTime ? "payment" : "subscription",

@@ -11,7 +11,9 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json().catch(() => ({}))
   const email = typeof body.email === "string" ? body.email.toLowerCase().trim() : ""
-  if (!email || !email.includes("@")) {
+  // RFC-5321 max length + basic format validation
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  if (!email || email.length > 254 || !EMAIL_RE.test(email)) {
     return NextResponse.json({ error: "Valid email required" }, { status: 400 })
   }
 

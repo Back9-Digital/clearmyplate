@@ -26,6 +26,8 @@ type FormData = {
   household_type: string[]
   will_eat: string[]
   wont_eat: string
+  allergies: string[]
+  other_allergies: string
   budget: number | null
   custom_budget: string
   use_leftovers: boolean
@@ -43,12 +45,16 @@ const initialData: FormData = {
   household_type: ["mixed_household"],
   will_eat: [],
   wont_eat: "",
+  allergies: [],
+  other_allergies: "",
   budget: 200,
   custom_budget: "",
   use_leftovers: true,
   vegetarian_night: false,
   keep_simple: true,
 }
+
+const allergyOptions = ["Gluten", "Dairy", "Eggs", "Nuts", "Shellfish", "Soy", "Sesame"]
 
 const foodPills = ["Chicken", "Fish", "Beef", "Pork", "Lamb", "Vegetarian", "Rice", "Pasta", "Potatoes", "Bread"]
 
@@ -187,14 +193,27 @@ export default function Onboard() {
         : [...d.will_eat, item],
     }))
 
+  const toggleAllergy = (item: string) =>
+    setData((d) => ({
+      ...d,
+      allergies: d.allergies.includes(item)
+        ? d.allergies.filter((x) => x !== item)
+        : [...d.allergies, item],
+    }))
+
   const handleGenerate = async () => {
     setLoading(true)
     setError(null)
     try {
+      const allAllergies = [
+        ...data.allergies,
+        ...data.other_allergies.split(",").map((s) => s.trim()).filter(Boolean),
+      ]
       const payload = {
         ...data,
         // Default household_type to mixed_household if nothing selected
         household_type: data.household_type.length ? data.household_type : ["mixed_household"],
+        allergies: allAllergies,
       }
 
       const res = await fetch("/api/plans/generate", {
@@ -459,15 +478,57 @@ export default function Onboard() {
               </div>
               <div className="mt-6">
                 <label className="mb-2 block text-xs font-semibold uppercase tracking-widest" style={{ color: GRAY }}>
-                  Won&rsquo;t eat (allergies, dislikes)
+                  Won&rsquo;t eat (preferences — we&rsquo;ll try to avoid)
                 </label>
                 <textarea
                   className="w-full resize-none rounded-2xl bg-white px-4 py-3 text-sm outline-none"
                   style={{ border: `1.5px solid ${BORDER}`, color: DARK, minHeight: 80 }}
-                  placeholder="e.g. shellfish, blue cheese, mushrooms…"
+                  placeholder="e.g. blue cheese, mushrooms…"
                   value={data.wont_eat}
                   onChange={(e) => set("wont_eat", e.target.value)}
                 />
+              </div>
+
+              {/* Allergies */}
+              <div className="mt-6">
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-widest" style={{ color: "#B91C1C" }}>
+                  Allergies &amp; Intolerances — never included
+                </label>
+                <p className="mb-3 text-xs" style={{ color: GRAY }}>
+                  These are treated as strict exclusions — never used in any meal or ingredient.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {allergyOptions.map((item) => {
+                    const selected = data.allergies.includes(item)
+                    return (
+                      <button
+                        key={item}
+                        onClick={() => toggleAllergy(item)}
+                        className="rounded-full px-4 py-2 text-sm font-medium transition-all"
+                        style={
+                          selected
+                            ? { backgroundColor: "#B91C1C", color: "white" }
+                            : { backgroundColor: "white", color: DARK, border: `1.5px solid ${BORDER}` }
+                        }
+                      >
+                        {item}
+                      </button>
+                    )
+                  })}
+                </div>
+                <div className="mt-3">
+                  <label className="mb-2 block text-xs font-semibold uppercase tracking-widest" style={{ color: GRAY }}>
+                    Other allergies
+                  </label>
+                  <input
+                    type="text"
+                    className="w-full rounded-2xl bg-white px-4 py-3 text-sm outline-none"
+                    style={{ border: `1.5px solid ${BORDER}`, color: DARK }}
+                    placeholder="e.g. pine nuts, kiwifruit…"
+                    value={data.other_allergies}
+                    onChange={(e) => set("other_allergies", e.target.value)}
+                  />
+                </div>
               </div>
             </div>
           )}

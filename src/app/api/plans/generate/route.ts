@@ -52,6 +52,20 @@ function buildMealPrefsSection(prefs: MealPref[]): string {
   return `\nFAMILY MEAL PREFERENCES (respect these frequencies when building the plan):\n${lines.join("\n")}\n`
 }
 
+type FamilyMember = { role: "adult" | "child"; name: string }
+
+function buildFamilySection(members: FamilyMember[]): string {
+  const named = members.filter((m) => m.name?.trim())
+  if (!named.length) return ""
+  const lines = named.map((m) => `- ${m.name} (${m.role})`)
+  return `\nFAMILY MEMBERS (use names in portion notes where helpful, e.g. "Phil's portion: 200g"):\n${lines.join("\n")}\n`
+}
+
+function buildAllergySection(allergies: string[]): string {
+  if (!allergies.length) return ""
+  return `\nSTRICT ALLERGIES — NEVER include these ingredients or derivatives under any circumstances:\n${allergies.map((a) => `- ${a}`).join("\n")}\nThis is a hard safety rule. Cross-contamination risk is real. Do not include, suggest, or reference these.\n`
+}
+
 function buildPrompt(body: Record<string, unknown>): string {
   const {
     goal, adults, kids, meals_together, meals, units,
@@ -59,9 +73,12 @@ function buildPrompt(body: Record<string, unknown>): string {
     vegetarian_night, keep_simple, household_type,
     meal_preferences,
     calorie_target, macro_protein, macro_carbs, macro_fat,
+    family_members, allergies,
   } = body
 
-  const mealPrefs: MealPref[] = Array.isArray(meal_preferences) ? meal_preferences : []
+  const mealPrefs: MealPref[]    = Array.isArray(meal_preferences) ? meal_preferences : []
+  const familyArr: FamilyMember[] = Array.isArray(family_members) ? family_members : []
+  const allergyArr: string[]      = Array.isArray(allergies) ? allergies.filter(Boolean) : []
 
   const macroSection = calorie_target
     ? `\nCALORIE & MACRO TARGETS (per adult, per day — size portions to hit these):
@@ -95,10 +112,10 @@ HOUSEHOLD:
 GOAL: ${goal}
 HOUSEHOLD TYPE: ${householdTypes.join(", ")}
 PORTION GUIDANCE: ${portionGuidance}
-
+${buildFamilySection(familyArr)}${buildAllergySection(allergyArr)}
 FOOD PREFERENCES:
 - Will eat: ${Array.isArray(will_eat) && will_eat.length ? will_eat.join(", ") : "everything"}
-- Won't eat (treat as allergies — never include): ${wont_eat || "nothing"}
+- Avoid if possible (preference, not allergy): ${wont_eat || "nothing"}
 
 WEEK RULES:
 ${use_leftovers ? "- Include exactly ONE meal that uses leftovers from a previous meal that week. Set is_leftover: true for that meal." : "- No leftover meals."}
@@ -152,7 +169,7 @@ export async function POST(req: NextRequest) {
 
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
-      .select("plan_type, generations_this_week, week_reset_at, calorie_target, macro_protein, macro_carbs, macro_fat")
+      .select("plan_type, generations_this_week, week_reset_at, calorie_target, macro_protein, macro_carbs, macro_fat, family_members, allergies")
       .eq("id", user.id)
       .single()
 
@@ -207,6 +224,9 @@ export async function POST(req: NextRequest) {
         macro_protein:    profile.macro_protein   ?? null,
         macro_carbs:      profile.macro_carbs     ?? null,
         macro_fat:        profile.macro_fat       ?? null,
+        // Profile-stored — override any client-sent values with the saved ones
+        family_members:   profile.family_members  ?? [],
+        allergies:        profile.allergies        ?? (Array.isArray(body.allergies) ? body.allergies : []),
       }) }],
     })
 
@@ -235,9 +255,17 @@ export async function POST(req: NextRequest) {
       parsed = JSON.parse(cleaned)
     }
 
+    // Persist allergies from onboarding payload if not already saved in profile
+    const allergiesToSave = Array.isArray(body.allergies) && body.allergies.length && !profile.allergies
+      ? body.allergies
+      : undefined
+
     await supabase
       .from("profiles")
-      .update({ generations_this_week: currentUsed + 1 })
+      .update({
+        generations_this_week: currentUsed + 1,
+        ...(allergiesToSave ? { allergies: allergiesToSave } : {}),
+      })
       .eq("id", user.id)
 
     // Non-blocking GHL tag + push after successful generation

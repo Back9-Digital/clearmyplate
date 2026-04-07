@@ -2,8 +2,13 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { ArrowLeft, Plus, Minus, Check, Save } from "lucide-react"
+import { ArrowLeft, Plus, Minus, Check, Save, ExternalLink } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import {
+  generationsAllowed,
+  generationsRemaining,
+  weekNeedsReset,
+} from "@/lib/generations"
 
 const SAGE     = "#4A7C6F"
 const BG       = "#F5F3EE"
@@ -14,12 +19,24 @@ const GRAY     = "#6B7B77"
 const ACCENT   = "#D4E8E2"
 
 const foodPills = ["Chicken", "Fish", "Beef", "Pork", "Lamb", "Vegetarian", "Rice", "Pasta", "Potatoes", "Bread"]
+const allergyOptions = ["Gluten", "Dairy", "Eggs", "Nuts", "Shellfish", "Soy", "Sesame"]
 
 const MACRO_PRESETS = [
   { label: "Muscle Building", calories: 2400, protein: 40, carbs: 35, fat: 25 },
   { label: "Fat Loss",        calories: 1800, protein: 35, carbs: 35, fat: 30 },
   { label: "Balanced",        calories: 2000, protein: 25, carbs: 50, fat: 25 },
 ]
+
+const PLAN_LABELS: Record<string, string> = {
+  free:           "Free",
+  family:         "Family",
+  family_monthly: "Family",
+  family_annual:  "Family",
+  launch_special: "Launch Special",
+  lifetime:       "Lifetime",
+}
+
+type FamilyMember = { role: "adult" | "child"; name: string }
 
 function SectionHeading({ title, description }: { title: string; description?: string }) {
   return (
@@ -84,19 +101,10 @@ function Counter({ value, onChange, min = 0 }: { value: number; onChange: (v: nu
 }
 
 function MacroSlider({
-  label,
-  value,
-  onChange,
-  max,
-  color = SAGE,
-  readOnly = false,
+  label, value, onChange, max, color = SAGE, readOnly = false,
 }: {
-  label: string
-  value: number
-  onChange?: (v: number) => void
-  max?: number
-  color?: string
-  readOnly?: boolean
+  label: string; value: number; onChange?: (v: number) => void
+  max?: number; color?: string; readOnly?: boolean
 }) {
   return (
     <div>
@@ -106,17 +114,11 @@ function MacroSlider({
       </div>
       {readOnly ? (
         <div className="relative h-2 overflow-hidden rounded-full" style={{ backgroundColor: MUTED_BG }}>
-          <div
-            className="absolute inset-y-0 left-0 rounded-full"
-            style={{ width: `${value}%`, backgroundColor: color, opacity: 0.5 }}
-          />
+          <div className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${value}%`, backgroundColor: color, opacity: 0.5 }} />
         </div>
       ) : (
         <input
-          type="range"
-          min={10}
-          max={max ?? 80}
-          value={value}
+          type="range" min={10} max={max ?? 80} value={value}
           onChange={(e) => onChange?.(Number(e.target.value))}
           className="w-full h-2 rounded-full appearance-none cursor-pointer"
           style={{ accentColor: color }}
@@ -133,13 +135,22 @@ export default function SettingsPage() {
   const [mealsTogether, setMealsTogether] = useState(true)
   const [timezone, setTimezone]           = useState("Pacific/Auckland")
 
+  // Family members
+  const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([
+    { role: "adult", name: "" },
+    { role: "adult", name: "" },
+    { role: "child", name: "" },
+  ])
+
   // Goal & budget
   const [goal, setGoal]     = useState<"maintain" | "build_muscle" | "lose_weight">("maintain")
   const [budget, setBudget] = useState(200)
 
   // Food preferences
-  const [willEat, setWillEat] = useState<string[]>(["Chicken", "Fish", "Beef", "Pasta", "Potatoes"])
-  const [wontEat, setWontEat] = useState("")
+  const [willEat, setWillEat]           = useState<string[]>(["Chicken", "Fish", "Beef", "Pasta", "Potatoes"])
+  const [wontEat, setWontEat]           = useState("")
+  const [allergies, setAllergies]       = useState<string[]>([])
+  const [otherAllergies, setOtherAllergies] = useState("")
 
   // Week preferences
   const [useLeftovers, setUseLeftovers]       = useState(true)
@@ -151,8 +162,13 @@ export default function SettingsPage() {
   const [calorieTarget, setCalorieTarget]     = useState(2000)
   const [macroProtein, setMacroProtein]       = useState(25)
   const [macroCarbs, setMacroCarbs]           = useState(50)
-  // Fat is derived: 100 - protein - carbs
   const macroFat = Math.max(0, 100 - macroProtein - macroCarbs)
+
+  // Billing
+  const [planType, setPlanType]               = useState("free")
+  const [generationsUsed, setGenerationsUsed] = useState(0)
+  const [weekResetAt, setWeekResetAt]         = useState<string | null>(null)
+  const [portalLoading, setPortalLoading]     = useState(false)
 
   const [saved, setSaved]     = useState(false)
   const [saving, setSaving]   = useState(false)
@@ -165,41 +181,93 @@ export default function SettingsPage() {
       if (!user) return
       supabase
         .from("profiles")
-        .select("calorie_target, macro_protein, macro_carbs, macro_fat")
+        .select("calorie_target, macro_protein, macro_carbs, macro_fat, plan_type, generations_this_week, week_reset_at, family_members, allergies")
         .eq("id", user.id)
         .single()
         .then(({ data }) => {
-          if (data?.calorie_target != null) {
+          if (!data) { setLoading(false); return }
+
+          // Calorie / macro
+          if (data.calorie_target != null) {
             setAdvancedEnabled(true)
             setCalorieTarget(data.calorie_target)
             setMacroProtein(data.macro_protein ?? 25)
             setMacroCarbs(data.macro_carbs ?? 50)
           }
+
+          // Billing
+          if (data.plan_type)             setPlanType(data.plan_type)
+          if (data.generations_this_week != null) setGenerationsUsed(data.generations_this_week)
+          if (data.week_reset_at)         setWeekResetAt(data.week_reset_at)
+
+          // Family members — derive adults/kids from stored data
+          if (Array.isArray(data.family_members) && data.family_members.length) {
+            const members = data.family_members as FamilyMember[]
+            setFamilyMembers(members)
+            setAdults(members.filter((m) => m.role === "adult").length || 2)
+            setKids(members.filter((m) => m.role === "child").length)
+          }
+
+          // Allergies
+          if (Array.isArray(data.allergies)) {
+            const known   = (data.allergies as string[]).filter((a) => allergyOptions.includes(a))
+            const unknown = (data.allergies as string[]).filter((a) => !allergyOptions.includes(a))
+            setAllergies(known)
+            setOtherAllergies(unknown.join(", "))
+          }
+
           setLoading(false)
         })
     })
   }, [])
 
+  // ── Family member helpers ────────────────────────────────────
+  const handleAdultsChange = (v: number) => {
+    setAdults(v)
+    setFamilyMembers((prev) => {
+      const prevAdults = prev.filter((m) => m.role === "adult")
+      const prevKids   = prev.filter((m) => m.role === "child")
+      const newAdults  = v > prevAdults.length
+        ? [...prevAdults, ...Array(v - prevAdults.length).fill(null).map(() => ({ role: "adult" as const, name: "" }))]
+        : prevAdults.slice(0, v)
+      return [...newAdults, ...prevKids]
+    })
+  }
+
+  const handleKidsChange = (v: number) => {
+    setKids(v)
+    setFamilyMembers((prev) => {
+      const prevAdults = prev.filter((m) => m.role === "adult")
+      const prevKids   = prev.filter((m) => m.role === "child")
+      const newKids    = v > prevKids.length
+        ? [...prevKids, ...Array(v - prevKids.length).fill(null).map(() => ({ role: "child" as const, name: "" }))]
+        : prevKids.slice(0, v)
+      return [...prevAdults, ...newKids]
+    })
+  }
+
+  const updateMemberName = (index: number, name: string) => {
+    setFamilyMembers((prev) => prev.map((m, i) => i === index ? { ...m, name } : m))
+  }
+
+  // ── Allergy helpers ──────────────────────────────────────────
+  const toggleAllergy = (item: string) =>
+    setAllergies((prev) => prev.includes(item) ? prev.filter((a) => a !== item) : [...prev, item])
+
+  // ── Macro helpers ────────────────────────────────────────────
   const applyPreset = (preset: typeof MACRO_PRESETS[number]) => {
     setCalorieTarget(preset.calories)
     setMacroProtein(preset.protein)
     setMacroCarbs(preset.carbs)
-    // fat is auto-derived
   }
 
-  const handleProteinChange = (v: number) => {
-    const clamped = Math.min(v, 80 - macroCarbs) // ensure fat >= 10
-    setMacroProtein(Math.max(10, clamped))
-  }
-
-  const handleCarbsChange = (v: number) => {
-    const clamped = Math.min(v, 80 - macroProtein) // ensure fat >= 10
-    setMacroCarbs(Math.max(10, clamped))
-  }
+  const handleProteinChange = (v: number) => setMacroProtein(Math.max(10, Math.min(v, 80 - macroCarbs)))
+  const handleCarbsChange   = (v: number) => setMacroCarbs(Math.max(10, Math.min(v, 80 - macroProtein)))
 
   const toggleWillEat = (item: string) =>
     setWillEat((prev) => prev.includes(item) ? prev.filter((x) => x !== item) : [...prev, item])
 
+  // ── Save ─────────────────────────────────────────────────────
   const handleSave = async () => {
     setSaving(true)
     try {
@@ -207,13 +275,20 @@ export default function SettingsPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
+      const allAllergies = [
+        ...allergies,
+        ...otherAllergies.split(",").map((s) => s.trim()).filter(Boolean),
+      ]
+
       await supabase
         .from("profiles")
         .update({
-          calorie_target: advancedEnabled ? calorieTarget  : null,
-          macro_protein:  advancedEnabled ? macroProtein   : null,
-          macro_carbs:    advancedEnabled ? macroCarbs     : null,
-          macro_fat:      advancedEnabled ? macroFat       : null,
+          calorie_target: advancedEnabled ? calorieTarget : null,
+          macro_protein:  advancedEnabled ? macroProtein  : null,
+          macro_carbs:    advancedEnabled ? macroCarbs    : null,
+          macro_fat:      advancedEnabled ? macroFat      : null,
+          family_members: familyMembers.filter((m) => m.name.trim()),
+          allergies:      allAllergies.length ? allAllergies : null,
         })
         .eq("id", user.id)
 
@@ -223,6 +298,31 @@ export default function SettingsPage() {
       setSaving(false)
     }
   }
+
+  // ── Billing helpers ──────────────────────────────────────────
+  const isPaid     = planType !== "free"
+  const isFamily   = planType === "family" || planType === "family_monthly" || planType === "family_annual"
+  const isLifetime = planType === "lifetime" || planType === "launch_special"
+  const limit      = generationsAllowed(planType)
+  const actualUsed = weekNeedsReset(weekResetAt ?? new Date().toISOString()) ? 0 : generationsUsed
+  const remaining  = generationsRemaining(planType, actualUsed)
+
+  const handlePortal = async () => {
+    setPortalLoading(true)
+    try {
+      const res = await fetch("/api/stripe/portal", { method: "POST" })
+      const { url } = await res.json()
+      if (url) window.location.href = url
+    } finally {
+      setPortalLoading(false)
+    }
+  }
+
+  // ── Render ───────────────────────────────────────────────────
+  const adultMembers = familyMembers.filter((m) => m.role === "adult")
+  const kidMembers   = familyMembers.filter((m) => m.role === "child")
+  const adultOffset  = 0
+  const kidOffset    = adultMembers.length
 
   return (
     <div className="min-h-screen pb-20" style={{ backgroundColor: BG }}>
@@ -259,10 +359,10 @@ export default function SettingsPage() {
             <SectionHeading title="Household" description="Who are we planning meals for?" />
             <div className="space-y-3">
               <Row label="Adults">
-                <Counter value={adults} onChange={setAdults} min={1} />
+                <Counter value={adults} onChange={handleAdultsChange} min={1} />
               </Row>
               <Row label="Kids">
-                <Counter value={kids} onChange={setKids} />
+                <Counter value={kids} onChange={handleKidsChange} />
               </Row>
               <Row label="We usually eat dinner together">
                 <Toggle checked={mealsTogether} onChange={setMealsTogether} />
@@ -282,6 +382,61 @@ export default function SettingsPage() {
                   <option value="Europe/London">London (GMT)</option>
                 </select>
               </Row>
+            </div>
+          </section>
+
+          <div className="h-px" style={{ backgroundColor: BORDER }} />
+
+          {/* ── Your Family ── */}
+          <section>
+            <SectionHeading
+              title="Your Family"
+              description="Name each person. The AI uses these to personalise portion notes and meal suggestions."
+            />
+            <div className="space-y-3">
+              {adultMembers.map((member, i) => (
+                <div
+                  key={`adult-${i}`}
+                  className="flex items-center gap-4 rounded-2xl bg-white px-5 py-4"
+                  style={{ border: `1px solid ${BORDER}` }}
+                >
+                  <span className="w-20 shrink-0 text-xs font-semibold uppercase tracking-widest" style={{ color: GRAY }}>
+                    Adult {i + 1}
+                  </span>
+                  <input
+                    type="text"
+                    value={member.name}
+                    onChange={(e) => updateMemberName(adultOffset + i, e.target.value)}
+                    placeholder={`e.g. ${["Phil", "Sarah", "Alex", "Jordan"][i] ?? "Name"}`}
+                    className="flex-1 bg-transparent text-sm outline-none"
+                    style={{ color: DARK }}
+                  />
+                </div>
+              ))}
+              {kidMembers.map((member, i) => (
+                <div
+                  key={`child-${i}`}
+                  className="flex items-center gap-4 rounded-2xl bg-white px-5 py-4"
+                  style={{ border: `1px solid ${BORDER}` }}
+                >
+                  <span className="w-20 shrink-0 text-xs font-semibold uppercase tracking-widest" style={{ color: GRAY }}>
+                    Child {i + 1}
+                  </span>
+                  <input
+                    type="text"
+                    value={member.name}
+                    onChange={(e) => updateMemberName(kidOffset + i, e.target.value)}
+                    placeholder={`e.g. ${["Mia", "Luca", "Noah", "Ella"][i] ?? "Name"}`}
+                    className="flex-1 bg-transparent text-sm outline-none"
+                    style={{ color: DARK }}
+                  />
+                </div>
+              ))}
+              {familyMembers.length === 0 && (
+                <p className="text-sm" style={{ color: GRAY }}>
+                  Increase the adult or kids count above to add family members.
+                </p>
+              )}
             </div>
           </section>
 
@@ -363,15 +518,57 @@ export default function SettingsPage() {
             </div>
             <div className="mt-4">
               <label className="mb-2 block text-xs font-semibold uppercase tracking-widest" style={{ color: GRAY }}>
-                Won&rsquo;t eat (allergies, dislikes)
+                Won&rsquo;t eat (preferences — we&rsquo;ll try to avoid)
               </label>
               <textarea
                 className="w-full resize-none rounded-2xl bg-white px-4 py-3 text-sm outline-none"
                 style={{ border: `1.5px solid ${BORDER}`, color: DARK, minHeight: 72 }}
-                placeholder="e.g. shellfish, blue cheese, mushrooms…"
+                placeholder="e.g. blue cheese, mushrooms…"
                 value={wontEat}
                 onChange={(e) => setWontEat(e.target.value)}
               />
+            </div>
+
+            {/* Allergies */}
+            <div className="mt-6">
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-widest" style={{ color: "#B91C1C" }}>
+                Allergies &amp; Intolerances — never included
+              </label>
+              <p className="mb-3 text-xs" style={{ color: GRAY }}>
+                These are treated as strict exclusions in every meal plan.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {allergyOptions.map((item) => {
+                  const selected = allergies.includes(item)
+                  return (
+                    <button
+                      key={item}
+                      onClick={() => toggleAllergy(item)}
+                      className="rounded-full px-4 py-2 text-sm font-medium transition-all"
+                      style={
+                        selected
+                          ? { backgroundColor: "#B91C1C", color: "white" }
+                          : { backgroundColor: "white", color: DARK, border: `1.5px solid ${BORDER}` }
+                      }
+                    >
+                      {item}
+                    </button>
+                  )
+                })}
+              </div>
+              <div className="mt-3">
+                <label className="mb-2 block text-xs font-semibold uppercase tracking-widest" style={{ color: GRAY }}>
+                  Other allergies
+                </label>
+                <input
+                  type="text"
+                  className="w-full rounded-2xl bg-white px-4 py-3 text-sm outline-none"
+                  style={{ border: `1.5px solid ${BORDER}`, color: DARK }}
+                  placeholder="e.g. pine nuts, kiwifruit…"
+                  value={otherAllergies}
+                  onChange={(e) => setOtherAllergies(e.target.value)}
+                />
+              </div>
             </div>
           </section>
 
@@ -410,15 +607,9 @@ export default function SettingsPage() {
               </Row>
 
               {advancedEnabled && !loading && (
-                <div
-                  className="rounded-2xl bg-white p-6 space-y-7"
-                  style={{ border: `1px solid ${BORDER}` }}
-                >
-                  {/* Presets */}
+                <div className="rounded-2xl bg-white p-6 space-y-7" style={{ border: `1px solid ${BORDER}` }}>
                   <div>
-                    <p className="mb-3 text-xs font-semibold uppercase tracking-widest" style={{ color: GRAY }}>
-                      Presets
-                    </p>
+                    <p className="mb-3 text-xs font-semibold uppercase tracking-widest" style={{ color: GRAY }}>Presets</p>
                     <div className="flex flex-wrap gap-2">
                       {MACRO_PRESETS.map((preset) => (
                         <button
@@ -433,87 +624,41 @@ export default function SettingsPage() {
                     </div>
                   </div>
 
-                  {/* Calorie target */}
                   <div>
-                    <label
-                      className="mb-2 block text-xs font-semibold uppercase tracking-widest"
-                      style={{ color: GRAY }}
-                    >
+                    <label className="mb-2 block text-xs font-semibold uppercase tracking-widest" style={{ color: GRAY }}>
                       Calories per adult per day (kcal)
                     </label>
-                    <div
-                      className="flex items-center gap-2 rounded-xl bg-white px-4 py-3"
-                      style={{ border: `1.5px solid ${BORDER}` }}
-                    >
+                    <div className="flex items-center gap-2 rounded-xl bg-white px-4 py-3" style={{ border: `1.5px solid ${BORDER}` }}>
                       <input
-                        type="number"
-                        min={800}
-                        max={5000}
-                        step={50}
-                        value={calorieTarget}
+                        type="number" min={800} max={5000} step={50} value={calorieTarget}
                         onChange={(e) => setCalorieTarget(Number(e.target.value))}
-                        className="flex-1 bg-transparent text-sm outline-none"
-                        style={{ color: DARK }}
+                        className="flex-1 bg-transparent text-sm outline-none" style={{ color: DARK }}
                       />
                       <span className="text-xs font-medium" style={{ color: GRAY }}>kcal</span>
                     </div>
                   </div>
 
-                  {/* Macro split */}
                   <div>
-                    <p className="mb-4 text-xs font-semibold uppercase tracking-widest" style={{ color: GRAY }}>
-                      Macro split
-                    </p>
+                    <p className="mb-4 text-xs font-semibold uppercase tracking-widest" style={{ color: GRAY }}>Macro split</p>
                     <div className="space-y-5">
-                      <MacroSlider
-                        label="Protein"
-                        value={macroProtein}
-                        onChange={handleProteinChange}
-                        max={80 - macroCarbs}
-                        color="#4A7C6F"
-                      />
-                      <MacroSlider
-                        label="Carbs"
-                        value={macroCarbs}
-                        onChange={handleCarbsChange}
-                        max={80 - macroProtein}
-                        color="#5B8DB8"
-                      />
-                      <MacroSlider
-                        label="Fat (auto-calculated)"
-                        value={macroFat}
-                        readOnly
-                        color="#9CA3AF"
-                      />
+                      <MacroSlider label="Protein" value={macroProtein} onChange={handleProteinChange} max={80 - macroCarbs} color="#4A7C6F" />
+                      <MacroSlider label="Carbs" value={macroCarbs} onChange={handleCarbsChange} max={80 - macroProtein} color="#5B8DB8" />
+                      <MacroSlider label="Fat (auto-calculated)" value={macroFat} readOnly color="#9CA3AF" />
                     </div>
-
-                    {/* Visual bar */}
                     <div className="mt-5 overflow-hidden rounded-full h-3 flex" style={{ backgroundColor: MUTED_BG }}>
                       <div style={{ width: `${macroProtein}%`, backgroundColor: "#4A7C6F" }} />
                       <div style={{ width: `${macroCarbs}%`, backgroundColor: "#5B8DB8" }} />
                       <div style={{ width: `${macroFat}%`, backgroundColor: "#D1D5DB" }} />
                     </div>
                     <div className="mt-2 flex gap-4 text-xs" style={{ color: GRAY }}>
-                      <span className="flex items-center gap-1">
-                        <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: "#4A7C6F" }} />
-                        Protein {macroProtein}%
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: "#5B8DB8" }} />
-                        Carbs {macroCarbs}%
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: "#D1D5DB" }} />
-                        Fat {macroFat}%
-                      </span>
+                      <span className="flex items-center gap-1"><span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: "#4A7C6F" }} />Protein {macroProtein}%</span>
+                      <span className="flex items-center gap-1"><span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: "#5B8DB8" }} />Carbs {macroCarbs}%</span>
+                      <span className="flex items-center gap-1"><span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: "#D1D5DB" }} />Fat {macroFat}%</span>
                     </div>
                   </div>
 
-                  {/* Estimated grams */}
                   <div className="rounded-xl px-4 py-3" style={{ backgroundColor: ACCENT }}>
-                    <p className="text-xs font-semibold uppercase tracking-widest mb-2" style={{ color: SAGE }}>
-                      At {calorieTarget} kcal / day
-                    </p>
+                    <p className="text-xs font-semibold uppercase tracking-widest mb-2" style={{ color: SAGE }}>At {calorieTarget} kcal / day</p>
                     <div className="flex gap-6 text-sm" style={{ color: DARK }}>
                       <span><b>{Math.round((calorieTarget * macroProtein) / 100 / 4)}g</b> protein</span>
                       <span><b>{Math.round((calorieTarget * macroCarbs)   / 100 / 4)}g</b> carbs</span>
@@ -524,6 +669,95 @@ export default function SettingsPage() {
               )}
             </div>
           </section>
+
+          <div className="h-px" style={{ backgroundColor: BORDER }} />
+
+          {/* ── Billing ── */}
+          <section>
+            <SectionHeading title="Billing & Plan" description="Your current subscription details." />
+            <div className="rounded-2xl bg-white p-6 space-y-5" style={{ border: `1px solid ${BORDER}` }}>
+
+              {/* Plan badge row */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: GRAY }}>Current plan</p>
+                  <p className="text-base font-bold" style={{ color: DARK }}>{PLAN_LABELS[planType] ?? planType}</p>
+                </div>
+                {isPaid ? (
+                  <span
+                    className="rounded-full px-3 py-1 text-xs font-semibold"
+                    style={{ backgroundColor: ACCENT, color: SAGE }}
+                  >
+                    Active ✓
+                  </span>
+                ) : (
+                  <span
+                    className="rounded-full px-3 py-1 text-xs font-semibold"
+                    style={{ backgroundColor: MUTED_BG, color: GRAY }}
+                  >
+                    Free
+                  </span>
+                )}
+              </div>
+
+              {/* Generations row */}
+              {isPaid && (
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: GRAY }}>
+                    Generations this week
+                  </p>
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ backgroundColor: MUTED_BG }}>
+                      <div
+                        className="h-full rounded-full transition-all"
+                        style={{
+                          width: `${limit > 0 ? Math.min((actualUsed / limit) * 100, 100) : 0}%`,
+                          backgroundColor: remaining === 0 ? "#D97706" : SAGE,
+                        }}
+                      />
+                    </div>
+                    <span className="text-sm font-semibold tabular-nums" style={{ color: remaining === 0 ? "#D97706" : DARK }}>
+                      {actualUsed} of {limit}
+                    </span>
+                  </div>
+                  {remaining === 0 && (
+                    <p className="mt-1.5 text-xs" style={{ color: "#B45309" }}>Resets every Monday at midnight NZ time.</p>
+                  )}
+                </div>
+              )}
+
+              {/* Action */}
+              <div className="pt-1">
+                {!isPaid && (
+                  <Link href="/#pricing">
+                    <button
+                      className="rounded-full px-5 py-2.5 text-sm font-semibold text-white"
+                      style={{ backgroundColor: SAGE }}
+                    >
+                      Upgrade plan →
+                    </button>
+                  </Link>
+                )}
+                {isFamily && (
+                  <button
+                    onClick={handlePortal}
+                    disabled={portalLoading}
+                    className="flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold transition-opacity disabled:opacity-60"
+                    style={{ border: `1.5px solid ${SAGE}`, color: SAGE }}
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                    {portalLoading ? "Opening…" : "Manage subscription"}
+                  </button>
+                )}
+                {isLifetime && (
+                  <p className="text-sm font-semibold" style={{ color: SAGE }}>
+                    Lifetime access ✓ — no subscription needed.
+                  </p>
+                )}
+              </div>
+            </div>
+          </section>
+
         </div>
 
         {/* Save button */}

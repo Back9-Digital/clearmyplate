@@ -4,6 +4,8 @@ import { createClient } from "@/lib/supabase/server"
 import { createClient as createAdminClient } from "@supabase/supabase-js"
 import AcceptInvite from "./AcceptInvite"
 
+export const dynamic = "force-dynamic"
+
 const BG     = "#F5F3EE"
 const DARK   = "#1C2B27"
 const GRAY   = "#6B7B77"
@@ -39,11 +41,16 @@ export default async function InvitePage({
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
 
-  const { data: invite } = await admin
+  const { data: invite, error: inviteError } = await admin
     .from("household_invites")
     .select("id, email, accepted_at")
     .eq("token", token)
-    .single()
+    .maybeSingle()
+
+  if (inviteError) {
+    console.error("[invite/page] Failed to look up invite:", inviteError)
+    return <ErrorCard title="Something went wrong" body="Unable to validate this invite link. Please try again." />
+  }
 
   if (!invite) {
     return <ErrorCard title="Invalid invite" body="This invite link is invalid or has expired." />

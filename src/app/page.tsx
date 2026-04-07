@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
+import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import {
   Check, Star, ChevronDown, ChevronUp,
@@ -185,7 +186,7 @@ export default function Home() {
 
       {/* ── Nav ── */}
       <header className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
-        <img src="/images/Clear My Plate Logo Horizontal Lockup.svg" alt="ClearMyPlate" height="56" style={{ height: 56 }} />
+        <Image src="/images/Clear My Plate Logo Horizontal Lockup.svg" alt="ClearMyPlate" width={224} height={56} className="h-8 w-auto sm:h-14" unoptimized priority />
         <Link href="/login">
           <Button
             variant="outline"
@@ -607,7 +608,7 @@ export default function Home() {
       {/* ── Footer ── */}
       <footer className="mx-auto max-w-6xl px-6 py-10">
         <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
-          <img src="/images/Clear My Plate Logo Horizontal Lockup.svg" alt="ClearMyPlate" height="56" style={{ height: 56 }} />
+          <Image src="/images/Clear My Plate Logo Horizontal Lockup.svg" alt="ClearMyPlate" width={224} height={56} className="h-8 w-auto sm:h-14" unoptimized priority />
           <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1">
             <p className="text-xs" style={{ color: GRAY }}>
               © {new Date().getFullYear()} ClearMyPlate. Made for families.

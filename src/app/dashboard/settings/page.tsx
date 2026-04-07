@@ -185,14 +185,17 @@ export default function SettingsPage() {
   // Load profile on mount
   useEffect(() => {
     const supabase = createClient()
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    // Use getSession (local read) — faster and more reliable on mobile than getUser (network call)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      const user = session?.user
       if (!user) return
       supabase
         .from("profiles")
         .select("calorie_target, macro_protein, macro_carbs, macro_fat, plan_type, generations_this_week, week_reset_at, family_members, allergies")
         .eq("id", user.id)
         .single()
-        .then(({ data }) => {
+        .then(({ data, error }) => {
+          if (error) console.error("[settings] profile fetch error:", error.message)
           if (!data) { setLoading(false); return }
 
           // Calorie / macro
@@ -232,7 +235,8 @@ export default function SettingsPage() {
   // Load pending invites
   useEffect(() => {
     const supabase = createClient()
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      const user = session?.user
       if (!user) return
       supabase
         .from("household_invites")
@@ -825,7 +829,7 @@ export default function SettingsPage() {
             <div className="space-y-3">
 
               {/* Email input + button */}
-              <div className="flex gap-3">
+              <div className="flex flex-col gap-3 sm:flex-row">
                 <div
                   className="flex flex-1 items-center gap-2 rounded-2xl bg-white px-4 py-3"
                   style={{ border: `1.5px solid ${BORDER}` }}
@@ -844,7 +848,7 @@ export default function SettingsPage() {
                 <button
                   onClick={handleSendInvite}
                   disabled={inviteSending || !inviteEmail.trim()}
-                  className="flex shrink-0 items-center gap-1.5 rounded-full px-5 py-2.5 text-sm font-semibold text-white transition-all disabled:opacity-50"
+                  className="flex w-full items-center justify-center gap-1.5 rounded-full px-5 py-2.5 text-sm font-semibold text-white transition-all disabled:opacity-50 sm:w-auto sm:shrink-0"
                   style={{ backgroundColor: SAGE }}
                 >
                   <UserPlus className="h-4 w-4" />

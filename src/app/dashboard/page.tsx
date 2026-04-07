@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic"
 
 import { Suspense } from "react"
 import Link from "next/link"
+import Image from "next/image"
 import { redirect } from "next/navigation"
 import { DollarSign, UtensilsCrossed, Target, ArrowRight, Zap, Users } from "lucide-react"
 import { PaymentSuccessBanner } from "@/components/PaymentSuccessBanner"
@@ -173,8 +174,8 @@ export default async function Dashboard() {
       <div className="min-h-screen" style={{ backgroundColor: BG }}>
         <header className="border-b" style={{ backgroundColor: "white", borderColor: BORDER }}>
           <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-            <img src="/images/Clear My Plate Logo Horizontal Lockup.svg" alt="ClearMyPlate" height="56" style={{ height: 56 }} />
-            <div className="flex items-center gap-3">
+            <Image src="/images/Clear My Plate Logo Horizontal Lockup.svg" alt="ClearMyPlate" width={224} height={56} className="h-8 w-auto sm:h-14" unoptimized priority />
+            <div className="flex items-center gap-2 sm:gap-3">
               <PushNotificationToggle />
               <span className="text-sm hidden sm:inline" style={{ color: GRAY }}>{user.email}</span>
               <div

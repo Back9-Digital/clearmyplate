@@ -1,4 +1,5 @@
 import Link from "next/link"
+import Image from "next/image"
 
 const BG     = "#F5F3EE"
 const BORDER = "#DDD9D1"
@@ -27,7 +28,7 @@ export default function PrivacyPage() {
         {/* Logo + back */}
         <div className="mb-10 flex items-center justify-between">
           <Link href="/">
-            <img src="/images/Clear My Plate Logo Horizontal Lockup.svg" alt="ClearMyPlate" style={{ height: 44 }} />
+            <Image src="/images/Clear My Plate Logo Horizontal Lockup.svg" alt="ClearMyPlate" width={176} height={44} className="h-11 w-auto" unoptimized />
           </Link>
           <Link href="/" className="text-sm font-medium" style={{ color: SAGE }}>
             ← Back to home

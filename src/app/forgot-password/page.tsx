@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import Link from "next/link"
+import Image from "next/image"
 import { createClient } from "@/lib/supabase/client"
 
 const SAGE   = "#4A7C6F"
@@ -42,11 +43,7 @@ export default function ForgotPasswordPage() {
 
         {/* Logo */}
         <div className="mb-8 flex justify-center">
-          <img
-            src="/images/Clear My Plate Logo Horizontal Lockup.svg"
-            alt="ClearMyPlate"
-            style={{ height: 48 }}
-          />
+          <Image src="/images/Clear My Plate Logo Horizontal Lockup.svg" alt="ClearMyPlate" width={192} height={48} className="h-12 w-auto" unoptimized priority />
         </div>
 
         {/* Card */}

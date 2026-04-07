@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+import Image from "next/image"
 import { Check, ChevronLeft, Plus, Minus, Users, Zap, Leaf } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 
@@ -267,11 +268,11 @@ export default function Onboard() {
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: BG }}>
-      <div className="mx-auto w-full max-w-lg px-6 pb-24 pt-10">
+      <div className="mx-auto w-full max-w-lg px-4 pb-24 pt-10 sm:px-6">
 
         {/* Header */}
         <div className="mb-6 flex items-center justify-between">
-          <img src="/images/Clear My Plate Logo Horizontal Lockup.svg" alt="ClearMyPlate" height="56" style={{ height: 56 }} />
+          <Image src="/images/Clear My Plate Logo Horizontal Lockup.svg" alt="ClearMyPlate" width={180} height={44} className="h-8 w-auto sm:h-11" unoptimized priority />
           <span className="text-xs font-medium" style={{ color: GRAY }}>Step {step + 1} of {TOTAL_STEPS}</span>
         </div>
 

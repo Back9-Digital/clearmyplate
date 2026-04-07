@@ -11,7 +11,7 @@ const GRAY   = "#6B7B77"
 const SAGE   = "#4A7C6F"
 const BORDER = "#DDD9D1"
 
-export function ErrorCard({ title, body }: { title: string; body: string }) {
+function ErrorCard({ title, body }: { title: string; body: string }) {
   return (
     <div className="min-h-screen flex items-center justify-center px-6" style={{ backgroundColor: BG }}>
       <div className="w-full max-w-sm text-center">
@@ -33,14 +33,44 @@ export default async function InvitePage({
   params: Promise<{ token: string }>
 }) {
   const { token } = await params
-
-  // Only check auth here — all invite validation happens in /api/invite/accept
-  // (admin client only works reliably in API routes, not server components)
   const supabase = await createClient()
+
+  // Look up invite with anon client — requires RLS policy:
+  // CREATE POLICY "Anyone can view invite by token" ON household_invites FOR SELECT USING (true);
+  const { data: invite, error: inviteError } = await supabase
+    .from("household_invites")
+    .select("id, email, accepted_at")
+    .eq("token", token)
+    .maybeSingle()
+
+  if (inviteError) {
+    console.error("[invite/page] invite lookup error:", inviteError.message)
+    return <ErrorCard title="Something went wrong" body="Unable to load this invite. Please try again." />
+  }
+
+  if (!invite) {
+    return <ErrorCard title="Invalid invite" body="This invite link is invalid or has expired." />
+  }
+
+  if (invite.accepted_at) {
+    return <ErrorCard title="Already accepted" body="This invite has already been used." />
+  }
+
+  // Check auth
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
     redirect(`/signup?invite=${token}`)
+  }
+
+  // Email mismatch
+  if (invite.email.toLowerCase() !== (user.email ?? "").toLowerCase()) {
+    return (
+      <ErrorCard
+        title="Wrong account"
+        body={`This invite was sent to ${invite.email}. Please sign in with that email address to accept it.`}
+      />
+    )
   }
 
   return <AcceptInvite token={token} />

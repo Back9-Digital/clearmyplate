@@ -1,11 +1,17 @@
 import webpush from "web-push"
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 
-webpush.setVapidDetails(
-  process.env.VAPID_EMAIL!,
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
-  process.env.VAPID_PRIVATE_KEY!
-)
+function initVapid() {
+  const email  = process.env.VAPID_EMAIL
+  const pubKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+  const privKey = process.env.VAPID_PRIVATE_KEY
+  if (!email || !pubKey || !privKey) {
+    console.warn("[push] VAPID env vars not set — push notifications disabled")
+    return false
+  }
+  webpush.setVapidDetails(email, pubKey, privKey)
+  return true
+}
 
 function adminClient() {
   return createSupabaseClient(
@@ -26,6 +32,8 @@ export type PushPayload = {
  * Never throws — errors are logged only.
  */
 export async function sendPushToUser(userId: string, payload: PushPayload): Promise<void> {
+  if (!initVapid()) return
+
   const supabase = adminClient()
 
   const { data: rows, error } = await supabase

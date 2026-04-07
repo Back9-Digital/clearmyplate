@@ -1,8 +1,6 @@
-const CACHE_NAME = "clearmyplate-v1"
+const CACHE_NAME = "clearmyplate-v2"
 
 const PRECACHE_URLS = [
-  "/dashboard",
-  "/dashboard/plan",
   "/images/Clear My Plate Logo Horizontal Lockup.svg",
   "/images/icon-192.png",
   "/images/icon-512.png",

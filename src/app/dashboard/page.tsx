@@ -70,16 +70,12 @@ export default async function Dashboard() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect("/login")
 
-  const { data: profile, error: profileError } = await supabase
+  const { data: profile } = await supabase
     .from("profiles")
     .select("plan_type, generations_this_week, week_reset_at, email, full_name, created_at")
     .eq("id", user.id)
     .single()
 
-  // Diagnostic — remove once resolved
-  console.log("[dashboard:profile] user.id =", user.id)
-  console.log("[dashboard:profile] data =", JSON.stringify(profile))
-  console.log("[dashboard:profile] error =", profileError ? JSON.stringify(profileError) : "none")
 
   const nztHour   = Number(new Intl.DateTimeFormat("en-NZ", { timeZone: "Pacific/Auckland", hour: "numeric", hour12: false }).format(new Date()))
   const timeOfDay = nztHour < 12 ? "Good morning" : nztHour < 17 ? "Good afternoon" : "Good evening"
@@ -135,11 +131,6 @@ export default async function Dashboard() {
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: BG }}>
-
-      {/* DEBUG — remove once resolved */}
-      <div style={{ background: "#ffeb3b", color: "#000", padding: "8px 16px", fontSize: 13, fontFamily: "monospace" }}>
-        DEBUG | user.id: {user.id} | profile: {profile ? JSON.stringify(profile) : "NULL"} | error: {profileError ? profileError.message : "none"} | planType: {planType}
-      </div>
 
       {/* Nav */}
       <header className="border-b" style={{ backgroundColor: "white", borderColor: BORDER }}>

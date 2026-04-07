@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 import Anthropic from "@anthropic-ai/sdk"
 import { createClient } from "@/lib/supabase/server"
 
+export const dynamic = "force-dynamic"
+
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
 const SYSTEM_PROMPT = `You are ClearMyPlate, a practical NZ family meal planning assistant. You write clear, achievable recipes for everyday home cooks. Use metric measurements (g, ml, kg, L, tsp, tbsp, cups). Suggest NZ-available ingredients. Write steps that are clear enough for a beginner. Never count calories or use diet-culture language. Always respond with valid JSON only — no markdown, no explanation.`

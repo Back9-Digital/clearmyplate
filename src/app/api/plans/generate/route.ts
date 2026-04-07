@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import Anthropic from "@anthropic-ai/sdk"
 import { createClient } from "@/lib/supabase/server"
+
+export const dynamic = "force-dynamic"
 import {
   generationsAllowed,
   generationsRemaining,
@@ -157,9 +159,50 @@ Respond with exactly this JSON structure (no markdown, just JSON):
 day_of_week: 1=Monday through 7=Sunday. Include all 7 days. grocery_list categories: Proteins, Produce, Dairy & Eggs, Pantry, Bakery.`
 }
 
+/** Truncate a string to maxLen chars to prevent prompt inflation */
+function truncate(s: unknown, maxLen: number): string {
+  if (typeof s !== "string") return ""
+  return s.slice(0, maxLen)
+}
+
+/** Sanitise and cap an array of strings */
+function safeStringArray(arr: unknown, maxItems: number, maxItemLen: number): string[] {
+  if (!Array.isArray(arr)) return []
+  return arr
+    .filter((x) => typeof x === "string")
+    .slice(0, maxItems)
+    .map((x) => (x as string).slice(0, maxItemLen))
+}
+
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json()
+    const rawBody = await req.json()
+
+    // ── Input sanitisation — prevent prompt inflation / token exhaustion ──
+    const body = {
+      ...rawBody,
+      // Free-text fields capped to prevent runaway prompts
+      wont_eat:    truncate(rawBody.wont_eat, 300),
+      // Arrays capped on both count and per-item length
+      will_eat:    safeStringArray(rawBody.will_eat,    20, 50),
+      allergies:   safeStringArray(rawBody.allergies,   20, 50),
+      household_type: safeStringArray(rawBody.household_type, 5, 50),
+      // Family member names: max 10 members, names capped at 30 chars
+      family_members: Array.isArray(rawBody.family_members)
+        ? rawBody.family_members.slice(0, 10).map((m: { role?: string; name?: string }) => ({
+            role: typeof m?.role === "string" ? m.role.slice(0, 20) : "adult",
+            name: typeof m?.name === "string" ? m.name.slice(0, 30) : "",
+          }))
+        : [],
+      // Meal prefs: max 30 saved meals in prompt
+      meal_preferences: Array.isArray(rawBody.meal_preferences)
+        ? rawBody.meal_preferences.slice(0, 30)
+        : [],
+      // Numeric fields — coerce and clamp
+      adults: Math.min(Math.max(Number(rawBody.adults) || 1, 1), 20),
+      kids:   Math.min(Math.max(Number(rawBody.kids)   || 0, 0), 20),
+      budget: Math.min(Math.max(Number(rawBody.budget)  || 200, 10), 10000),
+    }
 
     // ── Auth + generation limit check ──────────────────────────
     const supabase = await createClient()
@@ -176,8 +219,8 @@ export async function POST(req: NextRequest) {
       .single()
 
     if (profileError || !profile) {
-      console.error("[generate] Profile fetch failed:", profileError)
-      return NextResponse.json({ error: "Profile not found", detail: profileError?.message }, { status: 500 })
+      console.error("[generate] Profile fetch failed:", profileError?.message)
+      return NextResponse.json({ error: "Profile not found" }, { status: 500 })
     }
 
     const planType = profile.plan_type ?? "free"

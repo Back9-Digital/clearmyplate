@@ -3,6 +3,8 @@ import Stripe from "stripe"
 import { createClient } from "@supabase/supabase-js"
 import { createClient as createServerClient } from "@/lib/supabase/server"
 
+export const dynamic = "force-dynamic"
+
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2025-03-31.basil" })
 
 const ALLOWED_ORIGINS = [

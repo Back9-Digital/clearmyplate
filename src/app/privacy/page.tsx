@@ -27,11 +27,7 @@ export default function PrivacyPage() {
         {/* Logo + back */}
         <div className="mb-10 flex items-center justify-between">
           <Link href="/">
-            <img
-              src="/images/Clear My Plate Logo Horizontal Lockup.svg"
-              alt="ClearMyPlate"
-              style={{ height: 44 }}
-            />
+            <img src="/images/Clear My Plate Logo Horizontal Lockup.svg" alt="ClearMyPlate" style={{ height: 44 }} />
           </Link>
           <Link href="/" className="text-sm font-medium" style={{ color: SAGE }}>
             ← Back to home
@@ -53,25 +49,25 @@ export default function PrivacyPage() {
 
         <Section number={2} title="Information We Collect">
           <p>We collect the following information when you use ClearMyPlate:</p>
-          <ul className="mt-2 list-disc space-y-1.5 pl-5">
-            <li>
+          <div className="mt-3 space-y-3">
+            <p>
               <span className="font-medium" style={{ color: DARK }}>Account information:</span>{" "}
               Your name, email address, and password when you sign up.
-            </li>
-            <li>
+            </p>
+            <p>
               <span className="font-medium" style={{ color: DARK }}>Household information:</span>{" "}
               Number of adults and children in your household, weekly budget, dietary preferences, food allergies,
               and meal planning goals. This information is used solely to generate your personalised meal plans.
-            </li>
-            <li>
+            </p>
+            <p>
               <span className="font-medium" style={{ color: DARK }}>Usage data:</span>{" "}
               How you interact with the service, including meal plans generated, recipes saved, and grocery lists viewed.
-            </li>
-            <li>
+            </p>
+            <p>
               <span className="font-medium" style={{ color: DARK }}>Payment information:</span>{" "}
               Payment is processed securely by Stripe. ClearMyPlate does not store your full card details.
-            </li>
-          </ul>
+            </p>
+          </div>
         </Section>
 
         <Section number={3} title="How We Use Your Information">
@@ -104,7 +100,7 @@ export default function PrivacyPage() {
         <Section number={5} title="CRM and Marketing">
           <p>
             When you sign up or make a purchase, your name, email, and plan type are shared with our CRM system
-            (GoHighLevel) to manage customer communications. You can unsubscribe from marketing emails at any
+            (Amplify HQ) to manage customer communications. You can unsubscribe from marketing emails at any
             time using the unsubscribe link in any email.
           </p>
         </Section>
@@ -125,8 +121,8 @@ export default function PrivacyPage() {
           </ul>
           <p className="mt-2">
             To exercise these rights, contact us at{" "}
-            <a href="mailto:hello@clearmyplate.app" className="font-medium" style={{ color: SAGE }}>
-              hello@clearmyplate.app
+            <a href="mailto:clearmyplate@back9.co.nz" className="font-medium" style={{ color: SAGE }}>
+              clearmyplate@back9.co.nz
             </a>
           </p>
         </Section>
@@ -154,8 +150,8 @@ export default function PrivacyPage() {
         <Section number={11} title="Contact">
           <p>
             For privacy-related enquiries, contact us at{" "}
-            <a href="mailto:hello@clearmyplate.app" className="font-medium" style={{ color: SAGE }}>
-              hello@clearmyplate.app
+            <a href="mailto:clearmyplate@back9.co.nz" className="font-medium" style={{ color: SAGE }}>
+              clearmyplate@back9.co.nz
             </a>
           </p>
         </Section>

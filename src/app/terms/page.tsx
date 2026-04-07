@@ -27,11 +27,7 @@ export default function TermsPage() {
         {/* Logo + back */}
         <div className="mb-10 flex items-center justify-between">
           <Link href="/">
-            <img
-              src="/images/Clear My Plate Logo Horizontal Lockup.svg"
-              alt="ClearMyPlate"
-              style={{ height: 44 }}
-            />
+            <img src="/images/Clear My Plate Logo Horizontal Lockup.svg" alt="ClearMyPlate" style={{ height: 44 }} />
           </Link>
           <Link href="/" className="text-sm font-medium" style={{ color: SAGE }}>
             ← Back to home
@@ -143,8 +139,8 @@ export default function TermsPage() {
         <Section number={12} title="Contact">
           <p>
             For any questions about these Terms, contact us at{" "}
-            <a href="mailto:hello@clearmyplate.app" className="font-medium" style={{ color: SAGE }}>
-              hello@clearmyplate.app
+            <a href="mailto:clearmyplate@back9.co.nz" className="font-medium" style={{ color: SAGE }}>
+              clearmyplate@back9.co.nz
             </a>
           </p>
         </Section>

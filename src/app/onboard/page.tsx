@@ -229,8 +229,14 @@ export default function Onboard() {
         return
       }
 
+      if (res.status === 403 && result.trialExpired) {
+        setError("Your free trial has expired. Upgrade to continue generating meal plans.")
+        setLoading(false)
+        return
+      }
+
       if (res.status === 403 && result.limitReached) {
-        setError(`You've used all ${result.limit} generation${result.limit !== 1 ? "s" : ""} for this week. Resets every Monday. Upgrade for more.`)
+        setError(`You've used all ${result.limit} free meal plan${result.limit !== 1 ? "s" : ""}. Upgrade to keep generating.`)
         setLoading(false)
         return
       }

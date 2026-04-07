@@ -6,6 +6,8 @@ import {
   generationsRemaining,
   weekNeedsReset,
   getLastMondayMidnightUTC,
+  isPaidPlan,
+  trialDaysRemaining,
 } from "@/lib/generations"
 import { ghlAddTags } from "@/lib/ghl"
 import { sendPushToUser } from "@/lib/push"
@@ -169,7 +171,7 @@ export async function POST(req: NextRequest) {
 
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
-      .select("plan_type, generations_this_week, week_reset_at, calorie_target, macro_protein, macro_carbs, macro_fat, family_members, allergies")
+      .select("plan_type, generations_this_week, week_reset_at, calorie_target, macro_protein, macro_carbs, macro_fat, family_members, allergies, created_at")
       .eq("id", user.id)
       .single()
 
@@ -177,9 +179,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Profile not found" }, { status: 500 })
     }
 
-    // Reset weekly counter if we've crossed a Monday midnight NZT
-    let currentUsed = profile.generations_this_week
-    if (weekNeedsReset(profile.week_reset_at)) {
+    const planType = profile.plan_type ?? "free"
+
+    // ── Free trial expiry check ────────────────────────────────
+    if (!isPaidPlan(planType)) {
+      const daysLeft = trialDaysRemaining(profile.created_at ?? new Date().toISOString())
+      if (daysLeft <= 0) {
+        return NextResponse.json(
+          { error: "Your free trial has expired. Upgrade to continue.", trialExpired: true },
+          { status: 403 }
+        )
+      }
+    }
+
+    // ── Weekly reset — paid plans only ─────────────────────────
+    let currentUsed = profile.generations_this_week ?? 0
+    if (isPaidPlan(planType) && weekNeedsReset(profile.week_reset_at ?? new Date().toISOString())) {
       await supabase
         .from("profiles")
         .update({
@@ -190,15 +205,15 @@ export async function POST(req: NextRequest) {
       currentUsed = 0
     }
 
-    const limit = generationsAllowed(profile.plan_type)
-    const remaining = generationsRemaining(profile.plan_type, currentUsed)
+    const limit     = generationsAllowed(planType)
+    const remaining = generationsRemaining(planType, currentUsed)
 
     if (remaining <= 0) {
       return NextResponse.json(
         {
           error: "Generation limit reached",
           limitReached: true,
-          planType: profile.plan_type,
+          planType,
           limit,
         },
         { status: 403 }

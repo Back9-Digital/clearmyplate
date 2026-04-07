@@ -1,9 +1,9 @@
 // Generation limits per plan type
 export const PLAN_LIMITS: Record<string, number> = {
-  free:          0,
-  family:        3,
+  free:           2,  // lifetime total, not weekly
+  family:         3,
   launch_special: 3,
-  lifetime:      5,
+  lifetime:       5,
 }
 
 export function generationsAllowed(planType: string): number {
@@ -12,6 +12,11 @@ export function generationsAllowed(planType: string): number {
 
 export function generationsRemaining(planType: string, used: number): number {
   return Math.max(0, generationsAllowed(planType) - used)
+}
+
+/** Free users have a lifetime total (no weekly reset). Only paid plans reset weekly. */
+export function isPaidPlan(planType: string): boolean {
+  return planType !== "free"
 }
 
 /**
@@ -45,4 +50,11 @@ export function getLastMondayMidnightUTC(): Date {
 /** True if week_reset_at predates the most recent Monday midnight NZT */
 export function weekNeedsReset(weekResetAt: string): boolean {
   return new Date(weekResetAt) < getLastMondayMidnightUTC()
+}
+
+/** Days remaining in a 14-day free trial, based on account created_at. Negative = expired. */
+export function trialDaysRemaining(createdAt: string): number {
+  const msPerDay = 24 * 60 * 60 * 1000
+  const elapsed  = Date.now() - new Date(createdAt).getTime()
+  return Math.ceil(14 - elapsed / msPerDay)
 }

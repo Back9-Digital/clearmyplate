@@ -10,6 +10,8 @@ import {
   generationsAllowed,
   generationsRemaining,
   weekNeedsReset,
+  isPaidPlan,
+  trialDaysRemaining,
 } from "@/lib/generations"
 
 const SAGE      = "#4A7C6F"
@@ -68,7 +70,7 @@ export default async function Dashboard() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("plan_type, generations_this_week, week_reset_at, email, full_name")
+    .select("plan_type, generations_this_week, week_reset_at, email, full_name, created_at")
     .eq("id", user.id)
     .single()
 
@@ -78,13 +80,27 @@ export default async function Dashboard() {
   const greeting  = fullName ? `${timeOfDay}, ${fullName}` : timeOfDay
 
   const planType   = profile?.plan_type ?? "free"
-  const used       = weekNeedsReset(profile?.week_reset_at ?? new Date().toISOString())
+  const isPaid     = isPaidPlan(planType)
+
+  // Paid plans: apply weekly reset. Free plans: lifetime total, no reset.
+  const rawUsed    = profile?.generations_this_week ?? 0
+  const used       = isPaid && weekNeedsReset(profile?.week_reset_at ?? new Date().toISOString())
     ? 0
-    : (profile?.generations_this_week ?? 0)
+    : rawUsed
   const limit      = generationsAllowed(planType)
   const remaining  = generationsRemaining(planType, used)
   const initial    = (fullName ?? profile?.email ?? user.email ?? "?")[0].toUpperCase()
-  const isPaid     = planType !== "free"
+
+  // Free trial
+  const trialDaysLeft    = !isPaid ? trialDaysRemaining(profile?.created_at ?? new Date().toISOString()) : Infinity
+  const trialExpired     = !isPaid && trialDaysLeft <= 0
+  const hasFreePlansLeft = !isPaid && remaining > 0 && !trialExpired
+
+  const genStatValue = isPaid
+    ? `${remaining} of ${limit} this week`
+    : trialExpired
+      ? "Trial expired"
+      : `${used} of ${limit} used`
 
   const stats = [
     {
@@ -94,8 +110,8 @@ export default async function Dashboard() {
     },
     {
       icon: Target,
-      label: "Generations left",
-      value: isPaid ? `${remaining} of ${limit} this week` : "Upgrade to generate",
+      label: isPaid ? "Generations left" : "Free generations",
+      value: genStatValue,
       highlight: remaining === 0,
     },
     {
@@ -144,15 +160,21 @@ export default async function Dashboard() {
           <p className="mt-1 text-sm" style={{ color: GRAY }}>Here&rsquo;s your household overview.</p>
         </div>
 
-        {/* Upgrade prompt for free users */}
-        {!isPaid && (
+        {/* Free trial — active with generations remaining */}
+        {hasFreePlansLeft && (
           <div
             className="mb-6 flex items-center justify-between gap-4 rounded-2xl px-6 py-4"
             style={{ backgroundColor: ACCENT_BG, border: `1px solid ${SAGE}20` }}
           >
             <div>
-              <p className="font-semibold text-sm" style={{ color: DARK }}>You&rsquo;re on the free plan</p>
-              <p className="text-xs mt-0.5" style={{ color: GRAY }}>Upgrade to start generating personalised meal plans.</p>
+              <p className="font-semibold text-sm" style={{ color: DARK }}>
+                {used} of 2 free meal plans used
+              </p>
+              <p className="text-xs mt-0.5" style={{ color: GRAY }}>
+                {trialDaysLeft <= 7
+                  ? `Trial expires in ${trialDaysLeft} day${trialDaysLeft !== 1 ? "s" : ""} — upgrade to keep access.`
+                  : `Free trial — ${trialDaysLeft} days remaining.`}
+              </p>
             </div>
             <Link href="/#pricing">
               <button
@@ -165,7 +187,49 @@ export default async function Dashboard() {
           </div>
         )}
 
-        {/* Low generation warning for paid users */}
+        {/* Free trial — all generations used (but trial not expired) */}
+        {!isPaid && !trialExpired && remaining === 0 && (
+          <div
+            className="mb-6 flex items-center justify-between gap-4 rounded-2xl px-6 py-4"
+            style={{ backgroundColor: "#FEF3C7", border: "1px solid #FCD34D" }}
+          >
+            <div>
+              <p className="font-semibold text-sm" style={{ color: "#92400E" }}>You&rsquo;ve used both free meal plans</p>
+              <p className="text-xs mt-0.5" style={{ color: "#B45309" }}>Upgrade to keep generating personalised plans for your family.</p>
+            </div>
+            <Link href="/#pricing">
+              <button
+                className="shrink-0 rounded-full px-5 py-2 text-sm font-semibold text-white"
+                style={{ backgroundColor: "#D97706" }}
+              >
+                Upgrade →
+              </button>
+            </Link>
+          </div>
+        )}
+
+        {/* Free trial expired */}
+        {trialExpired && (
+          <div
+            className="mb-6 flex items-center justify-between gap-4 rounded-2xl px-6 py-4"
+            style={{ backgroundColor: "#FEE2E2", border: "1px solid #FECACA" }}
+          >
+            <div>
+              <p className="font-semibold text-sm" style={{ color: "#B91C1C" }}>Your free trial has expired</p>
+              <p className="text-xs mt-0.5" style={{ color: "#DC2626" }}>Upgrade to continue generating personalised meal plans.</p>
+            </div>
+            <Link href="/#pricing">
+              <button
+                className="shrink-0 rounded-full px-5 py-2 text-sm font-semibold text-white"
+                style={{ backgroundColor: "#DC2626" }}
+              >
+                Upgrade →
+              </button>
+            </Link>
+          </div>
+        )}
+
+        {/* Paid — weekly limit reached */}
         {isPaid && remaining === 0 && (
           <div
             className="mb-6 rounded-2xl px-6 py-4"

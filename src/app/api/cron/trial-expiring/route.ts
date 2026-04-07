@@ -20,17 +20,19 @@ export async function GET(req: NextRequest) {
 
   const supabase = adminClient()
 
-  // Paid users who haven't generated a plan in 5+ days
-  const cutoff = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString()
+  // Free users whose account is between 9 and 10 days old (5-day warning before 14-day trial ends)
+  const nineDAgo  = new Date(Date.now() - 9  * 24 * 60 * 60 * 1000).toISOString()
+  const tenDaysAgo = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString()
 
   const { data: profiles, error } = await supabase
     .from("profiles")
     .select("email")
-    .neq("plan_type", "free")
-    .or(`week_reset_at.is.null,week_reset_at.lt.${cutoff}`)
+    .eq("plan_type", "free")
+    .gte("created_at", tenDaysAgo)
+    .lte("created_at", nineDAgo)
 
   if (error) {
-    console.error("[cron/weekly-reminder] Query error:", error)
+    console.error("[cron/trial-expiring] Query error:", error)
     return NextResponse.json({ error: "Query failed" }, { status: 500 })
   }
 
@@ -39,17 +41,17 @@ export async function GET(req: NextRequest) {
   await Promise.allSettled(
     emails.map((email) =>
       Promise.all([
-        ghlAddTags(email, ["plan-reminder"]),
+        ghlAddTags(email, ["trial-expiring"]),
         sendPushToEmail(email, {
-          title: "Time to plan this week's meals 🥗",
-          body:  "You haven't generated a meal plan yet this week. Tap to get started.",
-          url:   "/dashboard",
+          title: "Your free trial ends in 5 days ⏳",
+          body:  "Upgrade now to keep generating personalised meal plans for your family.",
+          url:   "/#pricing",
         }),
       ])
     )
   )
 
-  console.log(`[cron/weekly-reminder] Notified ${emails.length} users`)
+  console.log(`[cron/trial-expiring] Notified ${emails.length} users`)
 
   return NextResponse.json({ ok: true, notified: emails.length })
 }

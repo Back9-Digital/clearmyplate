@@ -8,6 +8,7 @@ import {
   getLastMondayMidnightUTC,
 } from "@/lib/generations"
 import { ghlAddTags } from "@/lib/ghl"
+import { sendPushToUser } from "@/lib/push"
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -239,10 +240,15 @@ export async function POST(req: NextRequest) {
       .update({ generations_this_week: currentUsed + 1 })
       .eq("id", user.id)
 
-    // Non-blocking GHL tag after successful generation
+    // Non-blocking GHL tag + push after successful generation
     if (user.email) {
       ghlAddTags(user.email, ["plan-generated"]).catch(() => {})
     }
+    sendPushToUser(user.id, {
+      title: "Your meal plan is ready! 🍽️",
+      body:  "This week's 7-day dinner plan is waiting for you.",
+      url:   "/dashboard/plan",
+    }).catch(() => {})
 
     // Attempt to save plan to Supabase — non-fatal if tables don't exist yet
     let savedPlanId: string | null = null

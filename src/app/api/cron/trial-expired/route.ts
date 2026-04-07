@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 import { ghlAddTags } from "@/lib/ghl"
-import { sendPushToEmail } from "@/lib/push"
 
 export const dynamic = "force-dynamic"
 
@@ -20,36 +19,27 @@ export async function GET(req: NextRequest) {
 
   const supabase = adminClient()
 
-  // Paid users who haven't generated a plan in 5+ days
-  const cutoff = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString()
+  // Free users whose account is 14+ days old
+  const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString()
 
   const { data: profiles, error } = await supabase
     .from("profiles")
     .select("email")
-    .neq("plan_type", "free")
-    .or(`week_reset_at.is.null,week_reset_at.lt.${cutoff}`)
+    .eq("plan_type", "free")
+    .lte("created_at", fourteenDaysAgo)
 
   if (error) {
-    console.error("[cron/weekly-reminder] Query error:", error)
+    console.error("[cron/trial-expired] Query error:", error)
     return NextResponse.json({ error: "Query failed" }, { status: 500 })
   }
 
   const emails = (profiles ?? []).map((p) => p.email).filter(Boolean) as string[]
 
   await Promise.allSettled(
-    emails.map((email) =>
-      Promise.all([
-        ghlAddTags(email, ["plan-reminder"]),
-        sendPushToEmail(email, {
-          title: "Time to plan this week's meals 🥗",
-          body:  "You haven't generated a meal plan yet this week. Tap to get started.",
-          url:   "/dashboard",
-        }),
-      ])
-    )
+    emails.map((email) => ghlAddTags(email, ["trial-expired"]))
   )
 
-  console.log(`[cron/weekly-reminder] Notified ${emails.length} users`)
+  console.log(`[cron/trial-expired] Tagged ${emails.length} users with trial-expired`)
 
-  return NextResponse.json({ ok: true, notified: emails.length })
+  return NextResponse.json({ ok: true, tagged: emails.length })
 }

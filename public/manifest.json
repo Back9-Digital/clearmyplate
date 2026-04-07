@@ -1,0 +1,25 @@
+{
+  "name": "ClearMyPlate",
+  "short_name": "ClearMyPlate",
+  "description": "Family meal planning made simple. Plan the week, clear the plate.",
+  "theme_color": "#4A7C6F",
+  "background_color": "#F5F3EE",
+  "display": "standalone",
+  "orientation": "portrait",
+  "start_url": "/dashboard",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/images/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/images/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

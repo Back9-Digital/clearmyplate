@@ -3,6 +3,7 @@ import Link from "next/link"
 import { redirect } from "next/navigation"
 import { DollarSign, UtensilsCrossed, Target, ArrowRight, Zap } from "lucide-react"
 import { PaymentSuccessBanner } from "@/components/PaymentSuccessBanner"
+import { PushNotificationToggle } from "@/components/PushNotificationToggle"
 import { createClient } from "@/lib/supabase/server"
 import {
   generationsAllowed,
@@ -116,6 +117,7 @@ export default async function Dashboard() {
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <img src="/images/Clear My Plate Logo Horizontal Lockup.svg" alt="ClearMyPlate" height="56" style={{ height: 56 }} />
           <div className="flex items-center gap-3">
+            <PushNotificationToggle />
             <span className="text-sm" style={{ color: GRAY }}>{user.email}</span>
             <div
               className="flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold text-white"

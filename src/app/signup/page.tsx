@@ -15,6 +15,7 @@ function SignupForm() {
   const router       = useRouter()
   const searchParams = useSearchParams()
   const infoMessage  = searchParams.get("message")
+  const inviteToken  = searchParams.get("invite")
 
   const [firstName, setFirstName] = useState("")
   const [email, setEmail]         = useState("")
@@ -74,7 +75,12 @@ function SignupForm() {
       body: JSON.stringify({ firstName: firstName.trim() }),
     }).catch(() => {})
 
-    router.push("/onboard")
+    // If signed up via invite link, go to the invite page to accept — skip onboarding
+    if (inviteToken) {
+      router.push(`/invite/${inviteToken}`)
+    } else {
+      router.push("/onboard")
+    }
     router.refresh()
   }
 

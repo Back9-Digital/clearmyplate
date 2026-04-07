@@ -136,6 +136,11 @@ export default async function Dashboard() {
   return (
     <div className="min-h-screen" style={{ backgroundColor: BG }}>
 
+      {/* DEBUG — remove once resolved */}
+      <div style={{ background: "#ffeb3b", color: "#000", padding: "8px 16px", fontSize: 13, fontFamily: "monospace" }}>
+        DEBUG | user.id: {user.id} | profile: {profile ? JSON.stringify(profile) : "NULL"} | error: {profileError ? profileError.message : "none"} | planType: {planType}
+      </div>
+
       {/* Nav */}
       <header className="border-b" style={{ backgroundColor: "white", borderColor: BORDER }}>
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">

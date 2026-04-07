@@ -606,9 +606,17 @@ export default function Home() {
       <footer className="mx-auto max-w-6xl px-6 py-10">
         <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
           <img src="/images/Clear My Plate Logo Horizontal Lockup.svg" alt="ClearMyPlate" height="56" style={{ height: 56 }} />
-          <p className="text-xs" style={{ color: GRAY }}>
-            © {new Date().getFullYear()} ClearMyPlate. Made for families.
-          </p>
+          <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1">
+            <p className="text-xs" style={{ color: GRAY }}>
+              © {new Date().getFullYear()} ClearMyPlate. Made for families.
+            </p>
+            <Link href="/terms" className="text-xs" style={{ color: GRAY }}>
+              Terms of Service
+            </Link>
+            <Link href="/privacy" className="text-xs" style={{ color: GRAY }}>
+              Privacy Policy
+            </Link>
+          </div>
         </div>
       </footer>
     </div>

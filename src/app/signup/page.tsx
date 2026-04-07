@@ -20,12 +20,18 @@ function SignupForm() {
   const [email, setEmail]         = useState("")
   const [password, setPassword]   = useState("")
   const [confirm, setConfirm]     = useState("")
+  const [agreed, setAgreed]       = useState(false)
   const [error, setError]         = useState<string | null>(null)
   const [loading, setLoading]     = useState(false)
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
+
+    if (!agreed) {
+      setError("Please agree to the Terms of Service and Privacy Policy to continue.")
+      return
+    }
 
     if (password !== confirm) {
       setError("Passwords don't match.")
@@ -168,6 +174,53 @@ function SignupForm() {
                 placeholder="••••••••"
               />
             </div>
+
+            {/* Terms agreement */}
+            <label className="flex items-start gap-3 cursor-pointer">
+              <div className="relative mt-0.5 shrink-0">
+                <input
+                  type="checkbox"
+                  checked={agreed}
+                  onChange={(e) => setAgreed(e.target.checked)}
+                  className="sr-only"
+                />
+                <div
+                  className="flex h-4 w-4 items-center justify-center rounded transition-colors"
+                  style={{
+                    backgroundColor: agreed ? SAGE : "white",
+                    border: `1.5px solid ${agreed ? SAGE : BORDER}`,
+                  }}
+                >
+                  {agreed && (
+                    <svg className="h-2.5 w-2.5 text-white" viewBox="0 0 10 10" fill="none">
+                      <path d="M1.5 5l2.5 2.5 4.5-4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  )}
+                </div>
+              </div>
+              <span className="text-xs leading-relaxed" style={{ color: GRAY }}>
+                I agree to the{" "}
+                <a
+                  href="/terms"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-semibold"
+                  style={{ color: SAGE }}
+                >
+                  Terms of Service
+                </a>
+                {" "}and{" "}
+                <a
+                  href="/privacy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-semibold"
+                  style={{ color: SAGE }}
+                >
+                  Privacy Policy
+                </a>
+              </span>
+            </label>
 
             {error && (
               <p className="rounded-xl px-4 py-3 text-sm" style={{ backgroundColor: "#FEE2E2", color: "#B91C1C" }}>

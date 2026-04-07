@@ -84,18 +84,25 @@ export function PushNotificationToggle() {
     <button
       onClick={handleToggle}
       disabled={loading}
-      className="flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-all disabled:opacity-50"
+      title={enabled ? "Disable push notifications" : "Enable push notifications"}
+      className="flex shrink-0 items-center justify-center rounded-full transition-all disabled:opacity-50
+                 h-8 w-8 sm:h-auto sm:w-auto sm:gap-2 sm:px-4 sm:py-2 sm:text-sm sm:font-medium"
       style={{
         border: `1.5px solid ${enabled ? SAGE : BORDER}`,
         color: enabled ? SAGE : "#6B7B77",
         backgroundColor: enabled ? "#D4E8E2" : "transparent",
       }}
-      title={enabled ? "Disable push notifications" : "Enable push notifications"}
     >
       {enabled ? (
-        <><Bell className="h-4 w-4" /> Notifications on</>
+        <>
+          <Bell className="h-4 w-4 shrink-0" />
+          <span className="hidden sm:inline">Notifications on</span>
+        </>
       ) : (
-        <><BellOff className="h-4 w-4" /> Enable notifications</>
+        <>
+          <BellOff className="h-4 w-4 shrink-0" />
+          <span className="hidden sm:inline">Enable notifications</span>
+        </>
       )}
     </button>
   )

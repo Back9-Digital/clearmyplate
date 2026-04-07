@@ -172,10 +172,10 @@ export default async function Dashboard() {
 
     return (
       <div className="min-h-screen" style={{ backgroundColor: BG }}>
-        <header className="border-b" style={{ backgroundColor: "white", borderColor: BORDER }}>
-          <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-            <Image src="/images/Clear My Plate Logo Horizontal Lockup.svg" alt="ClearMyPlate" width={224} height={56} className="h-8 w-auto sm:h-14" unoptimized priority />
-            <div className="flex items-center gap-2 sm:gap-3">
+        <header className="overflow-hidden border-b" style={{ backgroundColor: "white", borderColor: BORDER }}>
+          <div className="mx-auto flex max-w-6xl items-center justify-between px-3 py-3 sm:px-6 sm:py-4">
+            <Image src="/images/Clear My Plate Logo Horizontal Lockup.svg" alt="ClearMyPlate" width={224} height={56} className="h-7 w-auto shrink-0 sm:h-14" unoptimized priority />
+            <div className="flex shrink-0 items-center gap-2 sm:gap-3">
               <PushNotificationToggle />
               <span className="text-sm hidden sm:inline" style={{ color: GRAY }}>{user.email}</span>
               <div

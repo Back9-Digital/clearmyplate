@@ -57,7 +57,24 @@ const initialData: FormData = {
 
 const allergyOptions = ["Gluten", "Dairy", "Eggs", "Nuts", "Shellfish", "Soy", "Sesame"]
 
-const foodPills = ["Chicken", "Fish", "Beef", "Pork", "Lamb", "Vegetarian", "Rice", "Pasta", "Potatoes", "Bread"]
+const foodPills = [
+  "Chicken",
+  "Fish",
+  "Beef mince",
+  "Beef steak",
+  "Beef roast",
+  "Pork mince",
+  "Pork chops",
+  "Pork roast",
+  "Lamb mince",
+  "Lamb chops",
+  "Lamb roast",
+  "Vegetarian",
+  "Rice",
+  "Pasta",
+  "Potatoes",
+  "Bread",
+]
 
 const householdCards = [
   {

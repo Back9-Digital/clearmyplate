@@ -219,7 +219,12 @@ export async function POST(req: NextRequest) {
       .single()
 
     if (profileError || !profile) {
-      console.error("[generate] Profile fetch failed:", profileError?.message)
+      console.error("[generate] Profile fetch failed:", {
+        message: profileError?.message,
+        code:    profileError?.code,
+        details: profileError?.details,
+        hint:    profileError?.hint,
+      })
       return NextResponse.json({ error: "Profile not found" }, { status: 500 })
     }
 

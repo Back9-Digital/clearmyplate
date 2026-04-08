@@ -117,9 +117,15 @@ GOAL: ${goal}
 HOUSEHOLD TYPE: ${householdTypes.join(", ")}
 PORTION GUIDANCE: ${portionGuidance}
 ${buildFamilySection(familyArr)}${buildAllergySection(allergyArr)}
-FOOD PREFERENCES:
-- Will eat: ${Array.isArray(will_eat) && will_eat.length ? will_eat.join(", ") : "everything"}
-- Avoid if possible (preference, not allergy): ${wont_eat || "nothing"}
+PERMITTED PROTEINS & CARB BASES — HARD RULE:
+${Array.isArray(will_eat) && will_eat.length
+  ? `ONLY use these as the base proteins and carb bases across all 7 meals: ${will_eat.join(", ")}. Do NOT use any other proteins or carb bases not on this list. Every meal must be built around one or more of these ingredients.`
+  : "No restrictions — use any proteins and carb bases."}
+
+EXCLUDED INGREDIENTS — HARD RULE:
+${wont_eat
+  ? `NEVER include ${wont_eat} in any meal, in any form. This is a strict exclusion, not a suggestion.`
+  : "No additional exclusions."}
 
 WEEK RULES:
 ${use_leftovers ? "- Include exactly ONE meal that uses leftovers from a previous meal that week. Set is_leftover: true for that meal." : "- No leftover meals."}

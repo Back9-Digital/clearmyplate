@@ -80,6 +80,11 @@ function buildPrompt(body: Record<string, unknown>): string {
     family_members, allergies,
   } = body
 
+  const mealsArr = Array.isArray(meals)
+    ? (meals as unknown[]).filter((m): m is string => typeof m === "string")
+    : ["dinner"]
+  const planLunch = mealsArr.includes("lunch")
+
   const mealPrefs: MealPref[]    = Array.isArray(meal_preferences) ? meal_preferences : []
   const familyArr: FamilyMember[] = Array.isArray(family_members) ? family_members : []
   const allergyArr: string[]      = Array.isArray(allergies) ? allergies.filter(Boolean) : []
@@ -104,12 +109,12 @@ Include a brief per-meal note if a dish is particularly high or low in any macro
   monday.setDate(today.getDate() - today.getDay() + 1)
   const weekStart = monday.toISOString().split("T")[0]
 
-  return `Create a 7-day dinner meal plan for this household.
+  return `Create a 7-day meal plan for this household.
 
 HOUSEHOLD:
 - Adults: ${adults}, Kids: ${kids}
 - Eat together: ${meals_together}
-- Meal types: ${Array.isArray(meals) ? meals.join(", ") : "dinner"}
+- Meal types: ${planLunch ? "dinner (all 7 days) + leftover-based adult lunch (Mon–Fri)" : "dinner only"}
 - Units: ${units || "metric"}
 - Weekly grocery budget: NZD $${budget || 200}
 
@@ -128,9 +133,25 @@ ${wont_eat
   : "No additional exclusions."}
 
 WEEK RULES:
-${use_leftovers ? "- Include exactly ONE meal that uses leftovers from a previous meal that week. Set is_leftover: true for that meal." : "- No leftover meals."}
+${use_leftovers ? "- Include exactly ONE dinner that uses leftovers from a previous dinner that week. Set is_leftover: true for that meal." : "- No leftover dinners."}
 ${vegetarian_night ? "- Include exactly ONE fully vegetarian dinner." : ""}
 ${keep_simple ? "- Keep meals simple: max 6 ingredients, under 30 min prep time." : ""}
+${planLunch ? `
+ADULT LUNCH RULES (Mon–Fri only):
+- Generate 5 adult-only weekday lunches (meal_type: "lunch", day_of_week 1–5).
+- Each lunch is based on leftovers from the PREVIOUS night's dinner:
+  • Monday lunch (day 1): Sunday's dinner is not in this plan — suggest a simple fridge-based option (e.g. toast with eggs, wrap with deli meat, last night's soup reheated).
+  • Tuesday lunch (day 2): uses Monday's dinner leftovers.
+  • Wednesday lunch (day 3): uses Tuesday's dinner leftovers.
+  • Thursday lunch (day 4): uses Wednesday's dinner leftovers.
+  • Friday lunch (day 5): uses Thursday's dinner leftovers.
+- Keep lunches minimal and quick (max 5 min prep). No cooking beyond reheating.
+- Examples: wraps, reheated portions, grain bowls, salad with leftover protein.
+- Set is_leftover: true for all lunch meals.
+- key_ingredients for lunches: list ONLY the ADDITIONAL ingredients needed beyond the dinner leftovers (e.g. wraps, bread rolls, salad leaves, mayo, cheese). Do NOT list the dinner protein/leftovers.
+- Saturday and Sunday: NO lunch planned.
+- Add all additional lunch ingredients to the grocery_list under category "Lunch extras".
+` : "- No lunches planned."}
 
 ${buildMealPrefsSection(mealPrefs)}${macroSection}
 TONE RULES:
@@ -153,16 +174,29 @@ Respond with exactly this JSON structure (no markdown, just JSON):
       "is_leftover": false,
       "prep_time_mins": 25,
       "portion_notes": "Adults: 200g chicken, Kids: 120g chicken"
-    }
+    }${planLunch ? `,
+    {
+      "day_of_week": 2,
+      "day_name": "Tuesday",
+      "meal_type": "lunch",
+      "meal_name": "Leftover [Monday dinner] wrap with salad",
+      "description": "Quick wrap using Monday's leftovers with fresh salad.",
+      "key_ingredients": ["wraps", "mayo", "salad leaves"],
+      "is_leftover": true,
+      "prep_time_mins": 5,
+      "portion_notes": "Adults only"
+    }` : ""}
   ],
   "grocery_list": [
     {"category": "Proteins", "name": "Chicken thighs", "quantity": "1 kg"},
     {"category": "Produce", "name": "Lemons", "quantity": "3"},
-    {"category": "Pantry", "name": "Olive oil", "quantity": "500 ml"}
+    {"category": "Pantry", "name": "Olive oil", "quantity": "500 ml"}${planLunch ? `,
+    {"category": "Lunch extras", "name": "Wraps", "quantity": "1 pack"},
+    {"category": "Lunch extras", "name": "Mayonnaise", "quantity": "1 jar"}` : ""}
   ]
 }
 
-day_of_week: 1=Monday through 7=Sunday. Include all 7 days. grocery_list categories: Proteins, Produce, Dairy & Eggs, Pantry, Bakery.`
+day_of_week: 1=Monday through 7=Sunday. Always include all 7 dinners.${planLunch ? " For lunches: include day_of_week 1–5 only (Mon–Fri). Order meals array: all 7 dinners first, then 5 lunches." : ""} grocery_list categories: Proteins, Produce, Dairy & Eggs, Pantry, Bakery${planLunch ? ", Lunch extras" : ""}.`
 }
 
 /** Truncate a string to maxLen chars to prevent prompt inflation */
@@ -285,7 +319,7 @@ export async function POST(req: NextRequest) {
     // Build and call AI
     const message = await anthropic.messages.create({
       model: "claude-sonnet-4-20250514",
-      max_tokens: 4096,
+      max_tokens: 6000,
       system: SYSTEM_PROMPT,
       messages: [{ role: "user", content: buildPrompt({
         ...body,

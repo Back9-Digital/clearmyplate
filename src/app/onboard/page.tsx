@@ -440,8 +440,16 @@ export default function Onboard() {
                       className="flex w-full items-center justify-between rounded-2xl bg-white px-5 py-4"
                       style={{ border: `2px solid ${checked ? SAGE : BORDER}` }}
                     >
-                      <span className="text-sm font-medium" style={{ color: DARK }}>{meal}</span>
-                      {checked && <Check className="h-4 w-4" style={{ color: SAGE }} />}
+                      <div className="text-left">
+                        <p className="text-sm font-medium" style={{ color: DARK }}>{meal}</p>
+                        {meal === "Lunch" && (
+                          <p className="mt-0.5 text-xs" style={{ color: GRAY }}>Leftover-based, adults only (Mon–Fri)</p>
+                        )}
+                        {meal === "Dinner" && (
+                          <p className="mt-0.5 text-xs" style={{ color: GRAY }}>All 7 days, whole family</p>
+                        )}
+                      </div>
+                      {checked && <Check className="h-4 w-4 shrink-0" style={{ color: SAGE }} />}
                     </button>
                   )
                 })}

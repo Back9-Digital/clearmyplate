@@ -1148,7 +1148,9 @@ function PlanPageInner() {
     try {
       const cached = localStorage.getItem("cmp_latest_plan")
       const prevPrefs = cached ? JSON.parse(cached) : {}
-      const body = { ...prevPrefs, instructions }
+      // Carry forward whether lunch was in the original plan
+      const hasLunch = plan?.meals.some((m) => m.meal_type === "lunch") ?? false
+      const body = { ...prevPrefs, instructions, meals: hasLunch ? ["dinner", "lunch"] : ["dinner"] }
       const res = await fetch("/api/plans/generate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
       const result = await res.json()
       if (res.status === 403 && result.limitReached) {
@@ -1378,89 +1380,141 @@ function PlanPageInner() {
             ) : (
               <>
                 {/* Summary bar */}
-                <div className="mb-6 rounded-2xl px-5 py-3 text-sm" style={{ backgroundColor: ACCENT, color: SAGE }}>
-                  {plan.meals.length} meals planned this week
-                  {plan.meals.some((m) => m.is_leftover) && " · includes leftover meal"}
-                </div>
+                {(() => {
+                  const dinnerCount = plan.meals.filter((m) => m.meal_type !== "lunch").length
+                  const lunchCount  = plan.meals.filter((m) => m.meal_type === "lunch").length
+                  return (
+                    <div className="mb-6 rounded-2xl px-5 py-3 text-sm" style={{ backgroundColor: ACCENT, color: SAGE }}>
+                      {dinnerCount} dinners{lunchCount > 0 ? ` · ${lunchCount} weekday lunches` : ""} this week
+                      {plan.meals.some((m) => m.is_leftover && m.meal_type !== "lunch") && " · includes leftover dinner"}
+                    </div>
+                  )
+                })()}
 
-                <div className="grid gap-4 sm:grid-cols-2">
-                  {plan.meals.map((meal) => (
-                    <div
-                      key={`${meal.day_of_week}-${meal.meal_name}`}
-                      className="rounded-2xl bg-white p-5"
-                      style={{ border: `1px solid ${BORDER}` }}
-                    >
-                      {/* Day header */}
-                      <div className="mb-3 flex items-center justify-between">
-                        <p className="font-semibold text-sm" style={{ color: DARK }}>{meal.day_name}</p>
-                        <div className="flex items-center gap-1.5">
-                          {meal.is_leftover && (
-                            <span className="rounded-full px-2.5 py-0.5 text-xs font-medium" style={{ backgroundColor: ACCENT, color: SAGE }}>
-                              Leftover
-                            </span>
+                {/* Day-grouped meal cards */}
+                {(() => {
+                  const dayGroups = [1,2,3,4,5,6,7].reduce<{ day: number; dinner: Meal | undefined; lunch: Meal | undefined }[]>((acc, d) => {
+                    const dinner = plan.meals.find((m) => m.day_of_week === d && m.meal_type !== "lunch")
+                    const lunch  = plan.meals.find((m) => m.day_of_week === d && m.meal_type === "lunch")
+                    if (dinner || lunch) acc.push({ day: d, dinner, lunch })
+                    return acc
+                  }, [])
+                  return (
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      {dayGroups.map(({ day, dinner, lunch }) => (
+                        <div
+                          key={day}
+                          className="rounded-2xl bg-white overflow-hidden"
+                          style={{ border: `1px solid ${BORDER}` }}
+                        >
+                          {/* Lunch card — weekdays only */}
+                          {lunch && (
+                            <div
+                              className="px-4 pt-4 pb-3"
+                              style={{ borderBottom: `1px solid ${BORDER}`, backgroundColor: "#F0F7F5" }}
+                            >
+                              <div className="mb-2 flex items-center gap-2">
+                                <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: GRAY }}>Lunch</span>
+                                <span className="rounded-full px-2 py-0.5 text-xs font-medium" style={{ backgroundColor: ACCENT, color: SAGE }}>Leftover</span>
+                              </div>
+                              <p className="font-medium text-sm leading-snug" style={{ color: DARK }}>{lunch.meal_name}</p>
+                              <p className="mt-0.5 text-xs leading-relaxed" style={{ color: GRAY }}>{lunch.description}</p>
+                              {lunch.key_ingredients?.length > 0 && (
+                                <div className="mt-2 flex flex-wrap gap-1">
+                                  {lunch.key_ingredients.map((ing) => (
+                                    <span key={ing} className="rounded-full px-2 py-0.5 text-xs" style={{ backgroundColor: MUTED_BG, color: GRAY }}>{ing}</span>
+                                  ))}
+                                </div>
+                              )}
+                              <button
+                                onClick={() => setRecipeFor(lunch)}
+                                className="mt-3 flex items-center gap-1 text-xs font-semibold"
+                                style={{ color: SAGE }}
+                              >
+                                <BookOpen className="h-3 w-3" />
+                                View Recipe
+                              </button>
+                            </div>
                           )}
-                          {meal.prep_time_mins > 0 && (
-                            <span className="text-xs" style={{ color: GRAY }}>{meal.prep_time_mins} min</span>
+
+                          {/* Dinner card */}
+                          {dinner && (
+                            <div className="p-5">
+                              {/* Day header */}
+                              <div className="mb-3 flex items-center justify-between">
+                                <p className="font-semibold text-sm" style={{ color: DARK }}>{dinner.day_name}</p>
+                                <div className="flex items-center gap-1.5">
+                                  {dinner.is_leftover && (
+                                    <span className="rounded-full px-2.5 py-0.5 text-xs font-medium" style={{ backgroundColor: ACCENT, color: SAGE }}>
+                                      Leftover
+                                    </span>
+                                  )}
+                                  {dinner.prep_time_mins > 0 && (
+                                    <span className="text-xs" style={{ color: GRAY }}>{dinner.prep_time_mins} min</span>
+                                  )}
+                                </div>
+                              </div>
+
+                              <p className="font-medium text-sm" style={{ color: DARK }}>{dinner.meal_name}</p>
+                              <p className="mt-1 text-xs leading-relaxed" style={{ color: GRAY }}>{dinner.description}</p>
+
+                              {dinner.portion_notes && (
+                                <p className="mt-2 rounded-lg px-3 py-1.5 text-xs" style={{ backgroundColor: MUTED_BG, color: GRAY }}>
+                                  {dinner.portion_notes}
+                                </p>
+                              )}
+
+                              {/* Ingredient pills */}
+                              <div className="mt-3 flex flex-wrap gap-1.5">
+                                {dinner.key_ingredients.map((ing) => (
+                                  <span key={ing} className="rounded-full px-2.5 py-0.5 text-xs" style={{ backgroundColor: MUTED_BG, color: GRAY }}>
+                                    {ing}
+                                  </span>
+                                ))}
+                              </div>
+
+                              {/* Actions */}
+                              <div className="mt-4 flex items-center gap-2">
+                                <button
+                                  onClick={() => setRecipeFor(dinner)}
+                                  className="flex flex-1 items-center justify-center gap-1.5 rounded-full py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90"
+                                  style={{ backgroundColor: SAGE }}
+                                >
+                                  <BookOpen className="h-3.5 w-3.5" />
+                                  View Recipe
+                                </button>
+                                {!viewOnly && (
+                                  <button
+                                    onClick={() => setSwapFor(dinner)}
+                                    className="flex items-center gap-1 rounded-full px-3 py-2 text-xs font-medium"
+                                    style={{ border: `1px solid ${BORDER}`, color: GRAY }}
+                                  >
+                                    <Shuffle className="h-3 w-3" />
+                                    Swap
+                                  </button>
+                                )}
+                                {!viewOnly && (
+                                  <button
+                                    onClick={() => handleHeartClick(dinner)}
+                                    className="flex items-center gap-1 rounded-full px-3 py-2 text-xs font-medium transition-all"
+                                    style={
+                                      favourites.includes(dinner.meal_name)
+                                        ? { backgroundColor: ACCENT, color: SAGE }
+                                        : { border: `1px solid ${BORDER}`, color: GRAY }
+                                    }
+                                  >
+                                    <Heart className="h-3 w-3" style={favourites.includes(dinner.meal_name) ? { fill: SAGE } : {}} />
+                                    {favourites.includes(dinner.meal_name) ? "Saved" : "Save"}
+                                  </button>
+                                )}
+                              </div>
+                            </div>
                           )}
                         </div>
-                      </div>
-
-                      <p className="font-medium text-sm" style={{ color: DARK }}>{meal.meal_name}</p>
-                      <p className="mt-1 text-xs leading-relaxed" style={{ color: GRAY }}>{meal.description}</p>
-
-                      {meal.portion_notes && (
-                        <p className="mt-2 rounded-lg px-3 py-1.5 text-xs" style={{ backgroundColor: MUTED_BG, color: GRAY }}>
-                          {meal.portion_notes}
-                        </p>
-                      )}
-
-                      {/* Ingredient pills */}
-                      <div className="mt-3 flex flex-wrap gap-1.5">
-                        {meal.key_ingredients.map((ing) => (
-                          <span key={ing} className="rounded-full px-2.5 py-0.5 text-xs" style={{ backgroundColor: MUTED_BG, color: GRAY }}>
-                            {ing}
-                          </span>
-                        ))}
-                      </div>
-
-                      {/* Actions */}
-                      <div className="mt-4 flex items-center gap-2">
-                        <button
-                          onClick={() => setRecipeFor(meal)}
-                          className="flex flex-1 items-center justify-center gap-1.5 rounded-full py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90"
-                          style={{ backgroundColor: SAGE }}
-                        >
-                          <BookOpen className="h-3.5 w-3.5" />
-                          View Recipe
-                        </button>
-                        {!viewOnly && (
-                        <button
-                          onClick={() => setSwapFor(meal)}
-                          className="flex items-center gap-1 rounded-full px-3 py-2 text-xs font-medium"
-                          style={{ border: `1px solid ${BORDER}`, color: GRAY }}
-                        >
-                          <Shuffle className="h-3 w-3" />
-                          Swap
-                        </button>
-                        )}
-                        {!viewOnly && (
-                        <button
-                          onClick={() => handleHeartClick(meal)}
-                          className="flex items-center gap-1 rounded-full px-3 py-2 text-xs font-medium transition-all"
-                          style={
-                            favourites.includes(meal.meal_name)
-                              ? { backgroundColor: ACCENT, color: SAGE }
-                              : { border: `1px solid ${BORDER}`, color: GRAY }
-                          }
-                        >
-                          <Heart className="h-3 w-3" style={favourites.includes(meal.meal_name) ? { fill: SAGE } : {}} />
-                          {favourites.includes(meal.meal_name) ? "Saved" : "Save"}
-                        </button>
-                        )}
-                      </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  )
+                })()}
 
                 {/* Regenerate all — owner only */}
                 {!viewOnly && (
@@ -1529,10 +1583,17 @@ function PlanPageInner() {
                 </div>
 
                 <div className="space-y-8">
-                  {Object.entries(groceryByCategory).map(([category, items]) => (
+                  {Object.entries(groceryByCategory).map(([category, items]) => {
+                    const isLunchExtras = category === "Lunch extras"
+                    return (
                     <div key={category}>
-                      <p className="mb-3 text-xs font-semibold uppercase tracking-widest" style={{ color: GRAY }}>{category}</p>
-                      <div className="overflow-hidden rounded-2xl bg-white" style={{ border: `1px solid ${BORDER}` }}>
+                      <div className="mb-3 flex items-center gap-2">
+                        <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: isLunchExtras ? SAGE : GRAY }}>{category}</p>
+                        {isLunchExtras && (
+                          <span className="rounded-full px-2 py-0.5 text-xs font-medium" style={{ backgroundColor: ACCENT, color: SAGE }}>Lunch</span>
+                        )}
+                      </div>
+                      <div className="overflow-hidden rounded-2xl bg-white" style={{ border: `1px solid ${isLunchExtras ? SAGE + "40" : BORDER}` }}>
                         {items.map((item, idx) => (
                           <button
                             key={item.name}
@@ -1566,7 +1627,8 @@ function PlanPageInner() {
                         ))}
                       </div>
                     </div>
-                  ))}
+                    )
+                  })}
                 </div>
               </>
             )}

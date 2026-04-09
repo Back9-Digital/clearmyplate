@@ -200,6 +200,10 @@ export default function SettingsPage() {
   const [inviteError, setInviteError]   = useState<string | null>(null)
   const [inviteSuccess, setInviteSuccess] = useState(false)
 
+  // Accepted household members
+  type AcceptedMember = { id: string; email: string; accepted_at: string }
+  const [acceptedMembers, setAcceptedMembers] = useState<AcceptedMember[]>([])
+
   // Load profile on mount
   useEffect(() => {
     const supabase = createClient()
@@ -288,12 +292,14 @@ export default function SettingsPage() {
     })
   }, [])
 
-  // Load pending invites
+  // Load pending invites + accepted members
   useEffect(() => {
     const supabase = createClient()
     supabase.auth.getSession().then(({ data: { session } }) => {
       const user = session?.user
       if (!user) return
+
+      // Pending (accepted_at IS NULL)
       supabase
         .from("household_invites")
         .select("id, email, created_at")
@@ -301,6 +307,15 @@ export default function SettingsPage() {
         .is("accepted_at", null)
         .order("created_at", { ascending: false })
         .then(({ data }) => { if (data) setInvites(data) })
+
+      // Accepted (accepted_at IS NOT NULL)
+      supabase
+        .from("household_invites")
+        .select("id, email, accepted_at")
+        .eq("household_id", user.id)
+        .not("accepted_at", "is", null)
+        .order("accepted_at", { ascending: false })
+        .then(({ data }) => { if (data) setAcceptedMembers(data) })
     })
   }, [])
 
@@ -335,6 +350,15 @@ export default function SettingsPage() {
       body: JSON.stringify({ id }),
     })
     if (res.ok) setInvites((prev) => prev.filter((i) => i.id !== id))
+  }
+
+  const handleRemoveMember = async (inviteId: string) => {
+    const res = await fetch("/api/household/member/remove", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ inviteId }),
+    })
+    if (res.ok) setAcceptedMembers((prev) => prev.filter((m) => m.id !== inviteId))
   }
 
   // ── Family member helpers ────────────────────────────────────
@@ -980,6 +1004,45 @@ export default function SettingsPage() {
               )}
               {inviteError && (
                 <p className="text-sm" style={{ color: "#B91C1C" }}>{inviteError}</p>
+              )}
+
+              {/* Accepted household members */}
+              {acceptedMembers.length > 0 && (
+                <div className="space-y-2 pt-1">
+                  <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: GRAY }}>
+                    Household members
+                  </p>
+                  {acceptedMembers.map((member) => (
+                    <div
+                      key={member.id}
+                      className="flex items-center justify-between rounded-2xl bg-white px-4 py-3"
+                      style={{ border: `1px solid ${BORDER}` }}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div>
+                          <p className="text-sm font-medium truncate" style={{ color: DARK }}>{member.email}</p>
+                          <p className="text-xs" style={{ color: GRAY }}>
+                            Joined {new Date(member.accepted_at).toLocaleDateString("en-NZ", { day: "numeric", month: "short" })}
+                          </p>
+                        </div>
+                        <span
+                          className="shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold"
+                          style={{ backgroundColor: ACCENT, color: SAGE }}
+                        >
+                          Viewer
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => handleRemoveMember(member.id)}
+                        className="ml-3 shrink-0 rounded-full p-1.5 transition-colors"
+                        style={{ color: GRAY }}
+                        title="Remove member"
+                      >
+                        <XIcon className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
               )}
 
               {/* Pending invites list */}

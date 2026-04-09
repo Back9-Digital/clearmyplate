@@ -170,6 +170,7 @@ export default function SettingsPage() {
   const [otherAllergies, setOtherAllergies] = useState("")
 
   // Week preferences
+  const [mealsPlanned, setMealsPlanned]       = useState<string[]>(["dinner"])
   const [useLeftovers, setUseLeftovers]       = useState(true)
   const [vegetarianNight, setVegetarianNight] = useState(false)
   const [keepSimple, setKeepSimple]           = useState(true)
@@ -208,7 +209,7 @@ export default function SettingsPage() {
       if (!user) return
       supabase
         .from("profiles")
-        .select("calorie_target, macro_protein, macro_carbs, macro_fat, plan_type, generations_this_week, week_reset_at, family_members, allergies, goal, weekly_budget, will_eat, wont_eat, use_leftovers, vegetarian_night, keep_simple")
+        .select("calorie_target, macro_protein, macro_carbs, macro_fat, plan_type, generations_this_week, week_reset_at, family_members, allergies, goal, weekly_budget, will_eat, wont_eat, use_leftovers, vegetarian_night, keep_simple, meals_planned")
         .eq("id", user.id)
         .single()
         .then(({ data, error }) => {
@@ -249,6 +250,7 @@ export default function SettingsPage() {
           if (data.weekly_budget != null) setBudget(data.weekly_budget)
           if (Array.isArray(data.will_eat) && data.will_eat.length) setWillEat(data.will_eat as string[])
           if (data.wont_eat != null)      setWontEat(data.wont_eat)
+          if (Array.isArray(data.meals_planned) && data.meals_planned.length) setMealsPlanned(data.meals_planned as string[])
           if (data.use_leftovers != null)    setUseLeftovers(data.use_leftovers)
           if (data.vegetarian_night != null) setVegetarianNight(data.vegetarian_night)
           if (data.keep_simple != null)      setKeepSimple(data.keep_simple)
@@ -381,6 +383,7 @@ export default function SettingsPage() {
           weekly_budget:    budget,
           will_eat:         willEat.length ? willEat : [],
           wont_eat:         wontEat || null,
+          meals_planned:    mealsPlanned.length ? mealsPlanned : ["dinner"],
           use_leftovers:    useLeftovers,
           vegetarian_night: vegetarianNight,
           keep_simple:      keepSimple,
@@ -673,6 +676,58 @@ export default function SettingsPage() {
           <section>
             <SectionHeading title="Week Preferences" description="Fine-tune how we build your weekly plan." />
             <div className="space-y-3">
+
+              {/* Meals planned */}
+              <div>
+                <p className="mb-2 text-sm font-medium" style={{ color: DARK }}>Meals to plan</p>
+                <div className="space-y-2">
+                  {([
+                    { key: "dinner", label: "Dinner", desc: "All 7 days, whole family" },
+                    { key: "lunch",  label: "Lunch",  desc: "Leftover-based, adults only (Mon–Fri)" },
+                  ] as const).map(({ key, label, desc }) => {
+                    const checked = mealsPlanned.includes(key)
+                    const toggle = () => {
+                      if (key === "dinner") return // dinner always required
+                      setMealsPlanned(checked
+                        ? mealsPlanned.filter((m) => m !== key)
+                        : [...mealsPlanned, key]
+                      )
+                    }
+                    return (
+                      <button
+                        key={key}
+                        onClick={toggle}
+                        disabled={key === "dinner"}
+                        className="flex w-full items-center justify-between rounded-2xl bg-white px-5 py-4 text-left"
+                        style={{
+                          border: `2px solid ${checked ? SAGE : BORDER}`,
+                          opacity: key === "dinner" ? 0.7 : 1,
+                          cursor: key === "dinner" ? "default" : "pointer",
+                        }}
+                      >
+                        <div>
+                          <p className="text-sm font-medium" style={{ color: DARK }}>{label}</p>
+                          <p className="mt-0.5 text-xs" style={{ color: GRAY }}>{desc}</p>
+                        </div>
+                        <div
+                          className="flex h-5 w-5 shrink-0 items-center justify-center rounded"
+                          style={{
+                            backgroundColor: checked ? SAGE : "white",
+                            border: `1.5px solid ${checked ? SAGE : BORDER}`,
+                          }}
+                        >
+                          {checked && (
+                            <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
+                              <path d="M1 4l3 3 5-5" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                          )}
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
               <Row label="Use leftovers" description="Plan one meal around leftovers from the night before.">
                 <Toggle checked={useLeftovers} onChange={setUseLeftovers} />
               </Row>

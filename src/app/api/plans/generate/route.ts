@@ -254,7 +254,7 @@ export async function POST(req: NextRequest) {
 
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
-      .select("plan_type, generations_this_week, week_reset_at, calorie_target, macro_protein, macro_carbs, macro_fat, family_members, allergies, goal, household_adults, household_kids, weekly_budget, will_eat, wont_eat, use_leftovers, vegetarian_night, keep_simple")
+      .select("plan_type, generations_this_week, week_reset_at, calorie_target, macro_protein, macro_carbs, macro_fat, family_members, allergies, goal, household_adults, household_kids, weekly_budget, will_eat, wont_eat, use_leftovers, vegetarian_night, keep_simple, meals_planned")
       .eq("id", user.id)
       .single()
 
@@ -342,6 +342,9 @@ export async function POST(req: NextRequest) {
           use_leftovers:    profile.use_leftovers,
           vegetarian_night: profile.vegetarian_night,
           keep_simple:      profile.keep_simple,
+          meals:            Array.isArray(profile.meals_planned) && profile.meals_planned.length
+                              ? profile.meals_planned
+                              : body.meals,
         } : {}),
       }) }],
     })

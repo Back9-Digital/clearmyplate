@@ -15,7 +15,7 @@ const CSP = [
   "frame-src 'none'",
   "object-src 'none'",
   "base-uri 'self'",
-  "form-action 'self'",
+  "form-action 'self' https://*.supabase.co",
 ].join("; ")
 
 const securityHeaders = [

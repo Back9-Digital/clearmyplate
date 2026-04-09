@@ -3,6 +3,8 @@
 import { useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
+import { useSearchParams } from "next/navigation"
+import { Suspense } from "react"
 import { createClient } from "@/lib/supabase/client"
 
 const SAGE   = "#4A7C6F"
@@ -11,10 +13,15 @@ const BORDER = "#DDD9D1"
 const DARK   = "#1C2B27"
 const GRAY   = "#6B7B77"
 
-export default function ForgotPasswordPage() {
+function ForgotPasswordInner() {
+  const searchParams = useSearchParams()
+  const linkExpired  = searchParams.get("error") === "link_expired"
+
   const [email, setEmail]     = useState("")
   const [sent, setSent]       = useState(false)
-  const [error, setError]     = useState<string | null>(null)
+  const [error, setError]     = useState<string | null>(
+    linkExpired ? "That reset link has expired or already been used. Enter your email to get a new one." : null
+  )
   const [loading, setLoading] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -24,7 +31,8 @@ export default function ForgotPasswordPage() {
 
     const supabase = createClient()
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: "https://www.clearmyplate.app/reset-password",
+      // Route through /auth/callback so PKCE code exchange happens server-side
+      redirectTo: "https://www.clearmyplate.app/auth/callback?next=/reset-password",
     })
 
     if (error) {
@@ -117,5 +125,13 @@ export default function ForgotPasswordPage() {
         </p>
       </div>
     </div>
+  )
+}
+
+export default function ForgotPasswordPage() {
+  return (
+    <Suspense fallback={null}>
+      <ForgotPasswordInner />
+    </Suspense>
   )
 }

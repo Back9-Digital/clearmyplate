@@ -283,6 +283,119 @@ function RecipeDrawer({
   )
 }
 
+// ── Swap Modal ──────────────────────────────────────────────
+function SwapModal({
+  meal,
+  onSwap,
+  onClose,
+  loading,
+}: {
+  meal: Meal
+  onSwap: (instruction: string, addToWontEat: boolean) => void
+  onClose: () => void
+  loading: boolean
+}) {
+  const [feedback, setFeedback]         = useState("")
+  const [addToWontEat, setAddToWontEat] = useState(false)
+
+  const buildInstruction = () => {
+    const base = `Replace ${meal.meal_name} on ${meal.day_name} with a completely different meal`
+    return feedback.trim() ? `${base}. Reason: ${feedback.trim()}` : base
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ backgroundColor: "rgba(0,0,0,0.4)" }}
+    >
+      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl" style={{ border: `1px solid ${BORDER}` }}>
+        <div className="mb-4 flex items-start justify-between">
+          <div className="flex-1 pr-4">
+            <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: SAGE }}>Swap meal</p>
+            <h3 className="font-bold text-base leading-snug" style={{ color: DARK }}>{meal.meal_name}</h3>
+            <p className="mt-0.5 text-xs" style={{ color: GRAY }}>{meal.day_name}</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="shrink-0 rounded-full p-2"
+            style={{ backgroundColor: MUTED_BG }}
+          >
+            <X className="h-4 w-4" style={{ color: GRAY }} />
+          </button>
+        </div>
+
+        {/* Optional feedback */}
+        <label className="mb-1.5 block text-xs font-semibold uppercase tracking-widest" style={{ color: GRAY }}>
+          What didn&rsquo;t you like? <span className="normal-case font-normal">(optional)</span>
+        </label>
+        <input
+          type="text"
+          maxLength={100}
+          className="w-full rounded-xl px-4 py-3 text-sm outline-none"
+          style={{ border: `1.5px solid ${BORDER}`, color: DARK }}
+          placeholder="e.g. too heavy, already had pasta this week…"
+          value={feedback}
+          onChange={(e) => setFeedback(e.target.value)}
+        />
+
+        {/* Wont-eat checkbox */}
+        <button
+          type="button"
+          onClick={() => setAddToWontEat((v) => !v)}
+          className="mt-4 flex items-center gap-3 w-full rounded-xl px-4 py-3 text-left transition-all"
+          style={{
+            backgroundColor: addToWontEat ? ACCENT : MUTED_BG,
+            border: `1.5px solid ${addToWontEat ? SAGE : BORDER}`,
+          }}
+        >
+          <div
+            className="flex h-4 w-4 shrink-0 items-center justify-center rounded"
+            style={{
+              border: `2px solid ${addToWontEat ? SAGE : BORDER}`,
+              backgroundColor: addToWontEat ? SAGE : "white",
+            }}
+          >
+            {addToWontEat && (
+              <svg width="8" height="6" viewBox="0 0 8 6" fill="none">
+                <path d="M1 3l2 2 4-4" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            )}
+          </div>
+          <p className="text-sm" style={{ color: DARK }}>
+            Don&rsquo;t suggest <span className="font-medium">{meal.meal_name}</span> again
+          </p>
+        </button>
+
+        <div className="mt-4 flex gap-3">
+          <button
+            onClick={() => onSwap(buildInstruction(), addToWontEat)}
+            disabled={loading}
+            className="flex flex-1 items-center justify-center gap-2 rounded-full py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+            style={{ backgroundColor: SAGE }}
+          >
+            {loading ? (
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+            ) : (
+              <>
+                <Shuffle className="h-4 w-4" />
+                Swap meal
+              </>
+            )}
+          </button>
+          <button
+            onClick={() => onSwap(buildInstruction(), false)}
+            disabled={loading}
+            className="rounded-full px-4 py-2.5 text-sm font-medium disabled:opacity-60"
+            style={{ border: `1.5px solid ${BORDER}`, color: GRAY }}
+          >
+            Skip
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Frequency Modal ─────────────────────────────────────────
 type Frequency = "weekly" | "fortnightly" | "monthly" | "ai_choice"
 
@@ -473,6 +586,10 @@ function PlanPageInner() {
   const [recipeFor, setRecipeFor]   = useState<Meal | null>(null)
   const [pendingFavMeal, setPendingFavMeal] = useState<Meal | null>(null)
   const [savingFreq, setSavingFreq] = useState(false)
+  // Preference memory
+  const [swapFor, setSwapFor]                   = useState<Meal | null>(null)
+  const [regenSavePrompt, setRegenSavePrompt]   = useState<string | null>(null) // instruction to offer saving
+  const [regenSaveState, setRegenSaveState]     = useState<"idle" | "saving" | "saved">("idle")
 
   // Load plan on mount
   useEffect(() => {
@@ -602,10 +719,22 @@ function PlanPageInner() {
     }
   }
 
+  // Append text to profiles.wont_eat (reads current value first to avoid overwriting)
+  const appendWontEat = async (text: string) => {
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const { data: profile } = await supabase.from("profiles").select("wont_eat").eq("id", user.id).single()
+    const existing = (profile?.wont_eat ?? "").trim()
+    const newVal   = existing ? `${existing}, ${text.trim()}` : text.trim()
+    await supabase.from("profiles").update({ wont_eat: newVal }).eq("id", user.id)
+  }
+
   const handleRegen = async (instructions: string) => {
     setRegenLoading(true)
     setError(null)
     setLimitReached(null)
+    setRegenSavePrompt(null)
     try {
       const cached = localStorage.getItem("cmp_latest_plan")
       const prevPrefs = cached ? JSON.parse(cached) : {}
@@ -621,6 +750,12 @@ function PlanPageInner() {
       localStorage.setItem("cmp_latest_plan", JSON.stringify(result))
       setPlan({ ...result, grocery_list: result.grocery_list.map((g: GroceryItem) => ({ ...g, checked: false })) })
       setRegenOpen(false)
+      // Offer to save instruction as a preference (non-swap instructions only, <100 chars)
+      const trimmed = instructions.trim()
+      if (trimmed && trimmed.length < 100 && !trimmed.startsWith("Replace ")) {
+        setRegenSavePrompt(trimmed)
+        setRegenSaveState("idle")
+      }
     } catch {
       setError("Regeneration failed — please try again.")
     } finally {
@@ -645,6 +780,67 @@ function PlanPageInner() {
   return (
     <div className="min-h-screen" style={{ backgroundColor: BG }}>
       {regenLoading && <GeneratingOverlay />}
+
+      {/* Swap modal */}
+      {swapFor && (
+        <SwapModal
+          meal={swapFor}
+          loading={regenLoading}
+          onClose={() => setSwapFor(null)}
+          onSwap={async (instruction, addToWontEat) => {
+            if (addToWontEat) {
+              await appendWontEat(swapFor.meal_name).catch(() => {})
+            }
+            setSwapFor(null)
+            await handleRegen(instruction)
+          }}
+        />
+      )}
+
+      {/* Regen instruction save toast */}
+      {regenSavePrompt && regenSaveState !== "saved" && (
+        <div
+          className="fixed bottom-6 left-1/2 z-50 w-full max-w-sm -translate-x-1/2 rounded-2xl px-5 py-4 shadow-lg"
+          style={{ backgroundColor: "white", border: `1px solid ${BORDER}` }}
+        >
+          <p className="text-sm font-medium mb-3" style={{ color: DARK }}>
+            💾 Save &ldquo;{regenSavePrompt.length > 40 ? regenSavePrompt.slice(0, 40) + "…" : regenSavePrompt}&rdquo; to your preferences?
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={async () => {
+                setRegenSaveState("saving")
+                await appendWontEat(regenSavePrompt!).catch(() => {})
+                setRegenSaveState("saved")
+                setTimeout(() => { setRegenSavePrompt(null); setRegenSaveState("idle") }, 1800)
+              }}
+              disabled={regenSaveState === "saving"}
+              className="flex-1 rounded-full py-2 text-xs font-semibold text-white disabled:opacity-60"
+              style={{ backgroundColor: SAGE }}
+            >
+              {regenSaveState === "saving" ? "Saving…" : "Yes, save it"}
+            </button>
+            <button
+              onClick={() => { setRegenSavePrompt(null); setRegenSaveState("idle") }}
+              className="rounded-full px-4 py-2 text-xs font-medium"
+              style={{ border: `1px solid ${BORDER}`, color: GRAY }}
+            >
+              No thanks
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Saved confirmation */}
+      {regenSaveState === "saved" && (
+        <div
+          className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-2xl px-5 py-3 shadow-lg"
+          style={{ backgroundColor: SAGE }}
+        >
+          <p className="text-sm font-medium text-white">Saved to your preferences ✓</p>
+        </div>
+      )}
+
       {regenOpen && (
         <RegenModal
           onClose={() => setRegenOpen(false)}
@@ -829,6 +1025,7 @@ function PlanPageInner() {
                         </button>
                         {!viewOnly && (
                         <button
+                          onClick={() => setSwapFor(meal)}
                           className="flex items-center gap-1 rounded-full px-3 py-2 text-xs font-medium"
                           style={{ border: `1px solid ${BORDER}`, color: GRAY }}
                         >

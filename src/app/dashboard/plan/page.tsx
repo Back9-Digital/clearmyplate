@@ -118,26 +118,34 @@ function formatTime(secs: number): string {
 function playBeep() {
   try {
     const ctx = new AudioContext()
-    const osc = ctx.createOscillator()
     const gain = ctx.createGain()
-    osc.connect(gain)
     gain.connect(ctx.destination)
-    osc.type = "sine"
-    osc.frequency.value = 880
-    gain.gain.setValueAtTime(0.4, ctx.currentTime)
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.8)
-    osc.start(ctx.currentTime)
-    osc.stop(ctx.currentTime + 0.8)
+    gain.gain.setValueAtTime(0, ctx.currentTime)
+    gain.gain.linearRampToValueAtTime(0.25, ctx.currentTime + 0.02)
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.4)
+    // Fundamental (A5) + fifth (E6) for a gentle chime chord
+    ;[880, 1320].forEach((freq) => {
+      const osc = ctx.createOscillator()
+      osc.type = "sine"
+      osc.frequency.value = freq
+      osc.connect(gain)
+      osc.start(ctx.currentTime)
+      osc.stop(ctx.currentTime + 1.4)
+    })
   } catch { /* AudioContext unavailable */ }
 }
 
 // ── Recipe Drawer ────────────────────────────────────────────
+const TIMER_COLORS = ["#4A7C6F", "#E07B54", "#5B8DB8", "#9B6B9B", "#C4A052"] as const
+
 type ActiveTimer = {
   id: string
-  label: string
+  stepNum: number   // 1-based step number
+  label: string     // truncated step text
   totalSecs: number
   remaining: number
   done: boolean
+  colorIndex: number
 }
 
 function RecipeDrawer({
@@ -232,10 +240,18 @@ function RecipeDrawer({
     setCompletedSteps((prev) => prev.map((v, idx) => idx === i ? !v : v))
 
   const startTimer = (stepIndex: number, mins: number, stepText: string) => {
-    const label = `Step ${stepIndex + 1}: ${stepText.length > 28 ? stepText.slice(0, 28) + "…" : stepText}`
+    const label = stepText.length > 40 ? stepText.slice(0, 40) + "…" : stepText
     setTimers((prev) => [
       ...prev,
-      { id: `${Date.now()}-${stepIndex}`, label, totalSecs: mins * 60, remaining: mins * 60, done: false },
+      {
+        id: `${Date.now()}-${stepIndex}`,
+        stepNum: stepIndex + 1,
+        label,
+        totalSecs: mins * 60,
+        remaining: mins * 60,
+        done: false,
+        colorIndex: prev.length % TIMER_COLORS.length,
+      },
     ])
   }
 
@@ -501,47 +517,74 @@ function RecipeDrawer({
           ) : null}
         </div>
 
-        {/* ── Feature 3: Floating timer bar (inside drawer, above scroll) ── */}
+        {/* ── Feature 3: Floating timer bar (inside drawer, pinned bottom) ── */}
         {timers.length > 0 && (
           <div
-            className="shrink-0 space-y-2 px-4 py-3"
-            style={{ borderTop: `1px solid ${BORDER}` }}
+            className="shrink-0 space-y-2 px-4 py-4"
+            style={{ borderTop: `2px solid ${BORDER}`, backgroundColor: "#FAFAF8" }}
           >
-            {timers.map((timer) => (
-              <div
-                key={timer.id}
-                className="flex items-center gap-2 rounded-xl px-3 py-2"
-                style={{
-                  backgroundColor: timer.done ? "#FEE2E2" : ACCENT,
-                  border: `1px solid ${timer.done ? "#FECACA" : SAGE + "30"}`,
-                }}
-              >
-                <span className="text-sm" style={{ color: SAGE }}>{timer.done ? "⏰" : "⏱️"}</span>
-                <span className="flex-1 truncate text-xs font-medium" style={{ color: DARK }}>
-                  {timer.label}
-                </span>
-                <span
-                  className="shrink-0 text-sm font-mono font-bold tabular-nums"
-                  style={{ color: timer.done ? "#B91C1C" : SAGE }}
+            {timers.map((timer) => {
+              const color = TIMER_COLORS[timer.colorIndex]
+              const tint  = color + "18"  // ~10% opacity background tint
+              return (
+                <div
+                  key={timer.id}
+                  className="flex items-center gap-3 rounded-2xl pl-0 pr-4 py-3 overflow-hidden"
+                  style={{
+                    backgroundColor: timer.done ? "#FFF0F0" : tint,
+                    border: `1px solid ${timer.done ? "#FFBBBB" : color + "40"}`,
+                    borderLeft: `5px solid ${timer.done ? "#EF4444" : color}`,
+                    animation: timer.done ? "timer-flash 0.7s ease-in-out infinite" : "none",
+                  }}
                 >
-                  {timer.done ? "Done!" : formatTime(timer.remaining)}
-                </span>
-                {timer.done && (
-                  <button
-                    onClick={() => snoozeTimer(timer.id)}
-                    className="shrink-0 rounded-full px-2 py-0.5 text-xs font-medium"
-                    style={{ backgroundColor: "#FEE2E2", color: "#B91C1C", border: "1px solid #FECACA" }}
+                  {/* Step info */}
+                  <div className="flex-1 min-w-0 pl-3">
+                    <p className="text-sm font-bold leading-tight" style={{ color: timer.done ? "#DC2626" : color }}>
+                      Step {timer.stepNum}
+                    </p>
+                    <p className="truncate text-xs leading-snug mt-0.5" style={{ color: GRAY }}>
+                      {timer.label}
+                    </p>
+                  </div>
+
+                  {/* Countdown */}
+                  <span
+                    className="shrink-0 text-xl font-mono font-black tabular-nums"
+                    style={{ color: timer.done ? "#DC2626" : color, letterSpacing: "-0.02em" }}
                   >
-                    +2m
+                    {timer.done ? "Done! ✓" : formatTime(timer.remaining)}
+                  </span>
+
+                  {/* +2m snooze when done */}
+                  {timer.done && (
+                    <button
+                      onClick={() => snoozeTimer(timer.id)}
+                      className="shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold"
+                      style={{ backgroundColor: "#FEE2E2", color: "#DC2626", border: "1px solid #FECACA" }}
+                    >
+                      +2m
+                    </button>
+                  )}
+
+                  {/* Dismiss */}
+                  <button
+                    onClick={() => dismissTimer(timer.id)}
+                    className="shrink-0 ml-1"
+                    aria-label="Dismiss timer"
+                  >
+                    <X className="h-4 w-4" style={{ color: timer.done ? "#DC2626" : color }} />
                   </button>
-                )}
-                <button onClick={() => dismissTimer(timer.id)} className="shrink-0">
-                  <X className="h-3.5 w-3.5" style={{ color: GRAY }} />
-                </button>
-              </div>
-            ))}
+                </div>
+              )
+            })}
           </div>
         )}
+        <style>{`
+          @keyframes timer-flash {
+            0%, 100% { opacity: 1; }
+            50%       { opacity: 0.45; }
+          }
+        `}</style>
       </div>
     </>
   )

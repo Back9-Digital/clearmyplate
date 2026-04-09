@@ -245,8 +245,8 @@ export default function SettingsPage() {
           setKids(savedKids)
 
           // Build a full family member list matching the household counts.
-          // Named members are preserved; unnamed slots are blank.
-          // Adult 1 defaults to the account owner's full_name.
+          // Adult 1 is ALWAYS the account owner (profiles.full_name) — ignore
+          // whatever may have been saved in family_members[0].
           const ownerName = ((data.full_name as string | null) ?? "").trim()
           const namedAdults = (Array.isArray(data.family_members)
             ? (data.family_members as FamilyMember[]).filter((m) => m.role === "adult")
@@ -256,7 +256,8 @@ export default function SettingsPage() {
             : [])
           const fullAdults: FamilyMember[] = Array.from({ length: savedAdults }, (_, i) => ({
             role: "adult",
-            name: namedAdults[i]?.name || (i === 0 ? ownerName : ""),
+            // i === 0 always uses ownerName — never the saved value
+            name: i === 0 ? ownerName : (namedAdults[i]?.name || ""),
           }))
           const fullKids: FamilyMember[] = Array.from({ length: savedKids }, (_, i) => ({
             role: "child",

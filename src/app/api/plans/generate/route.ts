@@ -337,20 +337,6 @@ export async function POST(req: NextRequest) {
       parsed = JSON.parse(cleaned)
     }
 
-    // Save latest plan to profile so household members can access it
-    await supabase
-      .from("profiles")
-      .update({
-        generations_this_week: currentUsed + 1,
-        latest_plan: {
-          plan_id:         savedPlanId,
-          week_start_date: parsed.week_start_date,
-          meals:           parsed.meals,
-          grocery_list:    parsed.grocery_list,
-        },
-      })
-      .eq("id", user.id)
-
     // Non-blocking GHL tag + push after successful generation
     if (user.email) {
       ghlAddTags(user.email, ["plan-generated"]).catch(() => {})
@@ -438,6 +424,26 @@ export async function POST(req: NextRequest) {
       }
     } catch {
       // Supabase save failed — still return the plan
+    }
+
+    // Save generations count + latest_plan to profile (after savedPlanId is resolved above)
+    console.log("[generate] saving latest_plan for user:", user.id, "savedPlanId:", savedPlanId)
+    const { error: profileUpdateError } = await supabase
+      .from("profiles")
+      .update({
+        generations_this_week: currentUsed + 1,
+        latest_plan: {
+          plan_id:         savedPlanId,
+          week_start_date: parsed.week_start_date,
+          meals:           parsed.meals,
+          grocery_list:    parsed.grocery_list,
+        },
+      })
+      .eq("id", user.id)
+    if (profileUpdateError) {
+      console.error("[generate] latest_plan save error:", profileUpdateError.message, profileUpdateError.code)
+    } else {
+      console.log("[generate] latest_plan saved successfully")
     }
 
     return NextResponse.json({

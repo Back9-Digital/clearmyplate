@@ -420,10 +420,12 @@ export default function SettingsPage() {
         ...otherAllergies.split(",").map((s) => s.trim()).filter(Boolean),
       ]
 
+      const ownerName = familyMembers.filter((m) => m.role === "adult")[0]?.name?.trim() || null
       console.log("[settings] saving adults:", adults, "kids:", kids)
       await supabase
         .from("profiles")
         .update({
+          full_name:        ownerName,
           calorie_target:   advancedEnabled ? calorieTarget : null,
           macro_protein:    advancedEnabled ? macroProtein  : null,
           macro_carbs:      advancedEnabled ? macroCarbs    : null,
@@ -538,56 +540,163 @@ export default function SettingsPage() {
 
           <div className="h-px" style={{ backgroundColor: BORDER }} />
 
-          {/* ── Your Family ── */}
+          {/* ── Your Household ── */}
           <section>
-            <SectionHeading
-              title="Your Family"
-              description="Name each person. The AI uses these to personalise portion notes and meal suggestions."
-            />
-            <div className="space-y-3">
-              {adultMembers.map((member, i) => (
-                <div
-                  key={`adult-${i}`}
-                  className="flex items-center gap-4 rounded-2xl bg-white px-5 py-4"
-                  style={{ border: `1px solid ${BORDER}` }}
-                >
-                  <span className="w-20 shrink-0 text-xs font-semibold uppercase tracking-widest" style={{ color: GRAY }}>
-                    Adult {i + 1}
+            <div className="mb-5">
+              <h2 className="text-base font-semibold" style={{ color: DARK }}>Your Household</h2>
+              <p className="mt-0.5 text-sm" style={{ color: GRAY }}>
+                {adults} {adults === 1 ? "adult" : "adults"}{kids > 0 ? ` · ${kids} ${kids === 1 ? "kid" : "kids"}` : ""}
+              </p>
+            </div>
+
+            <div className="space-y-2">
+
+              {/* Owner row */}
+              {(() => {
+                const owner = adultMembers[0]
+                const name  = owner?.name || ""
+                const init  = name.trim() ? name.trim()[0].toUpperCase() : "?"
+                return (
+                  <div className="flex items-center gap-3 rounded-2xl bg-white px-4 py-3" style={{ border: `1px solid ${BORDER}` }}>
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white" style={{ backgroundColor: SAGE }}>
+                      {init}
+                    </div>
+                    <input
+                      type="text"
+                      value={name}
+                      onChange={(e) => updateMemberName(adultOffset, e.target.value)}
+                      placeholder="Your name"
+                      className="flex-1 bg-transparent text-sm font-medium outline-none"
+                      style={{ color: DARK }}
+                    />
+                    <span className="shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold" style={{ backgroundColor: ACCENT, color: SAGE }}>
+                      Owner
+                    </span>
+                  </div>
+                )
+              })()}
+
+              {/* Accepted household members */}
+              {acceptedMembers.map((member) => (
+                <div key={member.id} className="flex items-center gap-3 rounded-2xl bg-white px-4 py-3" style={{ border: `1px solid ${BORDER}` }}>
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold" style={{ backgroundColor: MUTED_BG, color: GRAY }}>
+                    {member.email[0].toUpperCase()}
+                  </div>
+                  <p className="flex-1 min-w-0 truncate text-sm font-medium" style={{ color: DARK }}>{member.email}</p>
+                  <span className="shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold" style={{ backgroundColor: ACCENT, color: SAGE }}>
+                    Viewer
                   </span>
-                  <input
-                    type="text"
-                    value={member.name}
-                    onChange={(e) => updateMemberName(adultOffset + i, e.target.value)}
-                    placeholder={`e.g. ${["Phil", "Sarah", "Alex", "Jordan"][i] ?? "Name"}`}
-                    className="flex-1 bg-transparent text-sm outline-none"
-                    style={{ color: DARK }}
-                  />
+                  <button onClick={() => handleRemoveMember(member.id)} className="shrink-0 rounded-full p-1 transition-colors" style={{ color: GRAY }} title="Remove member">
+                    <XIcon className="h-4 w-4" />
+                  </button>
                 </div>
               ))}
-              {kidMembers.map((member, i) => (
-                <div
-                  key={`child-${i}`}
-                  className="flex items-center gap-4 rounded-2xl bg-white px-5 py-4"
-                  style={{ border: `1px solid ${BORDER}` }}
-                >
-                  <span className="w-20 shrink-0 text-xs font-semibold uppercase tracking-widest" style={{ color: GRAY }}>
-                    Child {i + 1}
-                  </span>
-                  <input
-                    type="text"
-                    value={member.name}
-                    onChange={(e) => updateMemberName(kidOffset + i, e.target.value)}
-                    placeholder={`e.g. ${["Mia", "Luca", "Noah", "Ella"][i] ?? "Name"}`}
-                    className="flex-1 bg-transparent text-sm outline-none"
-                    style={{ color: DARK }}
-                  />
+
+              {/* Additional adult name slots (skip owner at index 0) */}
+              {adultMembers.slice(1).map((member, i) => {
+                const globalIndex = adultOffset + 1 + i
+                const init = member.name.trim() ? member.name.trim()[0].toUpperCase() : null
+                return (
+                  <div key={`adult-${i + 1}`} className="flex items-center gap-3 rounded-2xl bg-white px-4 py-3" style={{ border: `1px solid ${BORDER}` }}>
+                    <div
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold"
+                      style={{ backgroundColor: MUTED_BG, color: init ? DARK : GRAY }}
+                    >
+                      {init ?? <Plus className="h-4 w-4" />}
+                    </div>
+                    <input
+                      type="text"
+                      value={member.name}
+                      onChange={(e) => updateMemberName(globalIndex, e.target.value)}
+                      placeholder={`e.g. ${["Sarah", "Alex", "Jordan"][i] ?? "Name"}`}
+                      className="flex-1 bg-transparent text-sm outline-none"
+                      style={{ color: DARK }}
+                    />
+                    <span className="shrink-0 text-xs font-medium" style={{ color: GRAY }}>Adult</span>
+                  </div>
+                )
+              })}
+
+              {/* Kid name slots */}
+              {kidMembers.map((member, i) => {
+                const globalIndex = kidOffset + i
+                const init = member.name.trim() ? member.name.trim()[0].toUpperCase() : null
+                return (
+                  <div key={`child-${i}`} className="flex items-center gap-3 rounded-2xl bg-white px-4 py-3" style={{ border: `1px solid ${BORDER}` }}>
+                    <div
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold"
+                      style={{ backgroundColor: MUTED_BG, color: init ? DARK : GRAY }}
+                    >
+                      {init ?? <Plus className="h-4 w-4" />}
+                    </div>
+                    <input
+                      type="text"
+                      value={member.name}
+                      onChange={(e) => updateMemberName(globalIndex, e.target.value)}
+                      placeholder={`e.g. ${["Mia", "Luca", "Noah", "Ella"][i] ?? "Name"}`}
+                      className="flex-1 bg-transparent text-sm outline-none"
+                      style={{ color: DARK }}
+                    />
+                    <span className="shrink-0 text-xs font-medium" style={{ color: GRAY }}>Child</span>
+                  </div>
+                )
+              })}
+
+              {/* Pending invites */}
+              {invites.length > 0 && (
+                <div className="space-y-2 pt-2">
+                  <p className="px-1 text-xs font-semibold uppercase tracking-widest" style={{ color: GRAY }}>Pending invites</p>
+                  {invites.map((invite) => (
+                    <div key={invite.id} className="flex items-center gap-3 rounded-2xl bg-white px-4 py-3" style={{ border: `1px solid ${BORDER}` }}>
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold" style={{ backgroundColor: "#FEF3C7", color: "#92400E" }}>
+                        {invite.email[0].toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate" style={{ color: DARK }}>{invite.email}</p>
+                        <p className="text-xs" style={{ color: GRAY }}>
+                          Invited {new Date(invite.created_at).toLocaleDateString("en-NZ", { day: "numeric", month: "short" })}
+                        </p>
+                      </div>
+                      <span className="shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold" style={{ backgroundColor: "#FEF3C7", color: "#92400E" }}>
+                        Pending
+                      </span>
+                      <button onClick={() => handleCancelInvite(invite.id)} className="shrink-0 rounded-full p-1 transition-colors" style={{ color: GRAY }} title="Cancel invite">
+                        <XIcon className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))}
                 </div>
-              ))}
-              {familyMembers.length === 0 && (
-                <p className="text-sm" style={{ color: GRAY }}>
-                  Increase the adult or kids count above to add family members.
-                </p>
               )}
+
+              {/* Invite input */}
+              <div className="pt-2">
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <div className="flex flex-1 items-center gap-2 rounded-2xl bg-white px-4 py-3" style={{ border: `1.5px solid ${BORDER}` }}>
+                    <Mail className="h-4 w-4 shrink-0" style={{ color: GRAY }} />
+                    <input
+                      type="email"
+                      value={inviteEmail}
+                      onChange={(e) => setInviteEmail(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handleSendInvite()}
+                      placeholder="Invite by email…"
+                      className="flex-1 bg-transparent text-sm outline-none"
+                      style={{ color: DARK }}
+                    />
+                  </div>
+                  <button
+                    onClick={handleSendInvite}
+                    disabled={inviteSending || !inviteEmail.trim()}
+                    className="flex w-full items-center justify-center gap-1.5 rounded-full px-5 py-2.5 text-sm font-semibold text-white transition-all disabled:opacity-50 sm:w-auto sm:shrink-0"
+                    style={{ backgroundColor: SAGE }}
+                  >
+                    <UserPlus className="h-4 w-4" />
+                    {inviteSending ? "Sending…" : "Invite"}
+                  </button>
+                </div>
+                {inviteSuccess && <p className="mt-2 text-sm font-medium" style={{ color: SAGE }}>Invite sent!</p>}
+                {inviteError && <p className="mt-2 text-sm" style={{ color: "#B91C1C" }}>{inviteError}</p>}
+              </div>
+
             </div>
           </section>
 
@@ -958,123 +1067,6 @@ export default function SettingsPage() {
                   </p>
                 )}
               </div>
-            </div>
-          </section>
-
-          <div className="h-px" style={{ backgroundColor: BORDER }} />
-
-          {/* ── Invite Family Members ── */}
-          <section>
-            <SectionHeading
-              title="Invite Family Members"
-              description="Invite someone to view your meal plan and tick off grocery items."
-            />
-            <div className="space-y-3">
-
-              {/* Email input + button */}
-              <div className="flex flex-col gap-3 sm:flex-row">
-                <div
-                  className="flex flex-1 items-center gap-2 rounded-2xl bg-white px-4 py-3"
-                  style={{ border: `1.5px solid ${BORDER}` }}
-                >
-                  <Mail className="h-4 w-4 shrink-0" style={{ color: GRAY }} />
-                  <input
-                    type="email"
-                    value={inviteEmail}
-                    onChange={(e) => setInviteEmail(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleSendInvite()}
-                    placeholder="family@example.com"
-                    className="flex-1 bg-transparent text-sm outline-none"
-                    style={{ color: DARK }}
-                  />
-                </div>
-                <button
-                  onClick={handleSendInvite}
-                  disabled={inviteSending || !inviteEmail.trim()}
-                  className="flex w-full items-center justify-center gap-1.5 rounded-full px-5 py-2.5 text-sm font-semibold text-white transition-all disabled:opacity-50 sm:w-auto sm:shrink-0"
-                  style={{ backgroundColor: SAGE }}
-                >
-                  <UserPlus className="h-4 w-4" />
-                  {inviteSending ? "Sending…" : "Invite"}
-                </button>
-              </div>
-
-              {inviteSuccess && (
-                <p className="text-sm font-medium" style={{ color: SAGE }}>Invite sent!</p>
-              )}
-              {inviteError && (
-                <p className="text-sm" style={{ color: "#B91C1C" }}>{inviteError}</p>
-              )}
-
-              {/* Accepted household members */}
-              {acceptedMembers.length > 0 && (
-                <div className="space-y-2 pt-1">
-                  <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: GRAY }}>
-                    Household members
-                  </p>
-                  {acceptedMembers.map((member) => (
-                    <div
-                      key={member.id}
-                      className="flex items-center justify-between rounded-2xl bg-white px-4 py-3"
-                      style={{ border: `1px solid ${BORDER}` }}
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div>
-                          <p className="text-sm font-medium truncate" style={{ color: DARK }}>{member.email}</p>
-                          <p className="text-xs" style={{ color: GRAY }}>
-                            Joined {new Date(member.accepted_at).toLocaleDateString("en-NZ", { day: "numeric", month: "short" })}
-                          </p>
-                        </div>
-                        <span
-                          className="shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold"
-                          style={{ backgroundColor: ACCENT, color: SAGE }}
-                        >
-                          Viewer
-                        </span>
-                      </div>
-                      <button
-                        onClick={() => handleRemoveMember(member.id)}
-                        className="ml-3 shrink-0 rounded-full p-1.5 transition-colors"
-                        style={{ color: GRAY }}
-                        title="Remove member"
-                      >
-                        <XIcon className="h-4 w-4" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Pending invites list */}
-              {invites.length > 0 && (
-                <div className="space-y-2 pt-1">
-                  <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: GRAY }}>
-                    Pending invites
-                  </p>
-                  {invites.map((invite) => (
-                    <div
-                      key={invite.id}
-                      className="flex items-center justify-between rounded-2xl bg-white px-4 py-3"
-                      style={{ border: `1px solid ${BORDER}` }}
-                    >
-                      <div>
-                        <p className="text-sm font-medium" style={{ color: DARK }}>{invite.email}</p>
-                        <p className="text-xs" style={{ color: GRAY }}>
-                          Sent {new Date(invite.created_at).toLocaleDateString("en-NZ", { day: "numeric", month: "short" })}
-                        </p>
-                      </div>
-                      <button
-                        onClick={() => handleCancelInvite(invite.id)}
-                        className="rounded-full p-1.5 transition-colors"
-                        style={{ color: GRAY }}
-                        title="Cancel invite"
-                      >
-                        <XIcon className="h-4 w-4" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
           </section>
 

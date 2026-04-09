@@ -14,7 +14,7 @@ export default function FavouritesPage() {
 
       {/* Nav */}
       <header className="border-b bg-white" style={{ borderColor: BORDER }}>
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6 sm:py-4">
           <div className="flex items-center gap-3">
             <Link href="/dashboard">
               <button className="flex items-center gap-1.5 text-sm" style={{ color: GRAY }}>
@@ -29,7 +29,7 @@ export default function FavouritesPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl px-6 py-10">
+      <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
         <div className="mb-8">
           <h1 className="text-2xl font-bold" style={{ color: DARK }}>Favourite Meals</h1>
           <p className="mt-1 text-sm" style={{ color: GRAY }}>

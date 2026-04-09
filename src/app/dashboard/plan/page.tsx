@@ -273,7 +273,7 @@ function RecipeDrawer({
 
       {/* Drawer */}
       <div
-        className="fixed bottom-0 left-0 right-0 z-50 flex flex-col rounded-t-3xl bg-white"
+        className="fixed bottom-0 left-0 right-0 z-50 flex flex-col rounded-t-3xl bg-white overflow-x-hidden"
         style={{ maxHeight: "90vh", boxShadow: "0 -4px 32px rgba(0,0,0,0.12)" }}
       >
         {/* Drag handle */}
@@ -282,7 +282,7 @@ function RecipeDrawer({
         </div>
 
         {/* Header */}
-        <div className="flex items-start justify-between px-6 pb-4 pt-3" style={{ borderBottom: `1px solid ${BORDER}` }}>
+        <div className="flex items-start justify-between px-4 pb-4 pt-3 sm:px-6" style={{ borderBottom: `1px solid ${BORDER}` }}>
           <div className="flex-1 pr-4">
             <p className="text-xs font-medium uppercase tracking-widest mb-1" style={{ color: SAGE }}>Recipe</p>
             <h2 className="text-lg font-bold leading-snug" style={{ color: DARK }}>{meal.meal_name}</h2>
@@ -312,7 +312,7 @@ function RecipeDrawer({
               </button>
             </div>
           ) : recipe ? (
-            <div className="px-6 py-5 pb-10 space-y-7">
+            <div className="px-4 py-5 pb-10 space-y-7 sm:px-6">
 
               {/* Stats row */}
               <div className="flex gap-5 flex-wrap">
@@ -1325,7 +1325,7 @@ function PlanPageInner() {
 
       {/* Header */}
       <header className="border-b bg-white" style={{ borderColor: BORDER }}>
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6 sm:py-4">
           <div className="flex items-center gap-3">
             <Link href="/dashboard">
               <button className="flex items-center gap-1.5 text-sm" style={{ color: GRAY }}>
@@ -1358,7 +1358,7 @@ function PlanPageInner() {
         </div>
       </header>
 
-      <div className="mx-auto max-w-6xl px-6 py-8">
+      <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
 
         {/* Tab switcher */}
         <div className="mb-6 inline-flex rounded-xl bg-white p-1" style={{ border: `1px solid ${BORDER}` }}>
@@ -1457,18 +1457,18 @@ function PlanPageInner() {
                           >
                             {/* ── Unified day header ── */}
                             <div
-                              className="flex items-center justify-between px-5 py-3"
+                              className="flex items-center justify-between px-4 py-3"
                               style={{ borderBottom: `1px solid ${BORDER}` }}
                             >
-                              <p className="font-bold text-sm" style={{ color: DARK }}>{dayName}</p>
+                              <p className="min-w-0 truncate font-bold text-sm" style={{ color: DARK }}>{dayName}</p>
                               {dinner && dinner.prep_time_mins > 0 && (
-                                <span className="text-xs" style={{ color: GRAY }}>{dinner.prep_time_mins} min dinner</span>
+                                <span className="ml-2 shrink-0 text-xs" style={{ color: GRAY }}>{dinner.prep_time_mins} min dinner</span>
                               )}
                             </div>
 
                             {/* ── Lunch section ── */}
                             {lunch && (
-                              <div className="px-5 py-4" style={{ backgroundColor: "#F0F7F5", borderBottom: `1px solid ${BORDER}` }}>
+                              <div className="px-4 py-4" style={{ backgroundColor: "#F0F7F5", borderBottom: `1px solid ${BORDER}` }}>
                                 <div className="mb-2 flex items-center gap-2">
                                   <span className="rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide" style={{ backgroundColor: ACCENT, color: SAGE }}>Lunch</span>
                                   <span className="rounded-full px-2 py-0.5 text-xs font-medium" style={{ backgroundColor: "#D4E8E2", color: SAGE }}>Leftover</span>
@@ -1495,7 +1495,7 @@ function PlanPageInner() {
 
                             {/* ── Dinner section ── */}
                             {dinner && (
-                              <div className="px-5 py-4">
+                              <div className="px-4 py-4">
                                 <div className="mb-2 flex items-center gap-2">
                                   <span className="rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide" style={{ backgroundColor: MUTED_BG, color: GRAY }}>Dinner</span>
                                   {dinner.is_leftover && (
@@ -1520,38 +1520,38 @@ function PlanPageInner() {
                                   ))}
                                 </div>
 
-                                <div className="mt-4 flex items-center gap-2">
+                                <div className="mt-4 flex flex-col gap-2">
                                   <button
                                     onClick={() => setRecipeFor(dinner)}
-                                    className="flex flex-1 items-center justify-center gap-1.5 rounded-full py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90"
+                                    className="flex w-full items-center justify-center gap-1.5 rounded-full py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90"
                                     style={{ backgroundColor: SAGE }}
                                   >
                                     <BookOpen className="h-3.5 w-3.5" />
                                     View Recipe
                                   </button>
                                   {!viewOnly && (
-                                    <button
-                                      onClick={() => setSwapFor(dinner)}
-                                      className="flex items-center gap-1 rounded-full px-3 py-2 text-xs font-medium"
-                                      style={{ border: `1px solid ${BORDER}`, color: GRAY }}
-                                    >
-                                      <Shuffle className="h-3 w-3" />
-                                      Swap
-                                    </button>
-                                  )}
-                                  {!viewOnly && (
-                                    <button
-                                      onClick={() => handleHeartClick(dinner)}
-                                      className="flex items-center gap-1 rounded-full px-3 py-2 text-xs font-medium transition-all"
-                                      style={
-                                        favourites.includes(dinner.meal_name)
-                                          ? { backgroundColor: ACCENT, color: SAGE }
-                                          : { border: `1px solid ${BORDER}`, color: GRAY }
-                                      }
-                                    >
-                                      <Heart className="h-3 w-3" style={favourites.includes(dinner.meal_name) ? { fill: SAGE } : {}} />
-                                      {favourites.includes(dinner.meal_name) ? "Saved" : "Save"}
-                                    </button>
+                                    <div className="flex gap-2">
+                                      <button
+                                        onClick={() => setSwapFor(dinner)}
+                                        className="flex flex-1 items-center justify-center gap-1 rounded-full py-2 text-xs font-medium"
+                                        style={{ border: `1px solid ${BORDER}`, color: GRAY }}
+                                      >
+                                        <Shuffle className="h-3 w-3" />
+                                        Swap
+                                      </button>
+                                      <button
+                                        onClick={() => handleHeartClick(dinner)}
+                                        className="flex flex-1 items-center justify-center gap-1 rounded-full py-2 text-xs font-medium transition-all"
+                                        style={
+                                          favourites.includes(dinner.meal_name)
+                                            ? { backgroundColor: ACCENT, color: SAGE }
+                                            : { border: `1px solid ${BORDER}`, color: GRAY }
+                                        }
+                                      >
+                                        <Heart className="h-3 w-3" style={favourites.includes(dinner.meal_name) ? { fill: SAGE } : {}} />
+                                        {favourites.includes(dinner.meal_name) ? "Saved" : "Save"}
+                                      </button>
+                                    </div>
                                   )}
                                 </div>
                               </div>
@@ -1648,10 +1648,10 @@ function PlanPageInner() {
                           <button
                             key={item.name}
                             onClick={() => toggleChecked(item.name)}
-                            className="flex w-full items-center justify-between px-5 py-4 text-left transition-colors"
+                            className="flex w-full items-center justify-between px-4 py-4 text-left transition-colors"
                             style={idx > 0 ? { borderTop: `1px solid ${BORDER}` } : {}}
                           >
-                            <div className="flex items-center gap-3">
+                            <div className="flex min-w-0 flex-1 items-center gap-3">
                               <div
                                 className="flex h-5 w-5 shrink-0 items-center justify-center rounded"
                                 style={{
@@ -1666,13 +1666,13 @@ function PlanPageInner() {
                                 )}
                               </div>
                               <span
-                                className="text-sm"
+                                className="truncate text-sm"
                                 style={{ color: item.checked ? GRAY : DARK, textDecoration: item.checked ? "line-through" : "none" }}
                               >
                                 {item.name}
                               </span>
                             </div>
-                            <span className="text-sm" style={{ color: GRAY }}>{item.quantity}</span>
+                            <span className="ml-3 shrink-0 text-sm" style={{ color: GRAY }}>{item.quantity}</span>
                           </button>
                         ))}
                       </div>

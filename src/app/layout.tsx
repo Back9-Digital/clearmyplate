@@ -29,7 +29,7 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-title" content="ClearMyPlate" />
         <meta name="mobile-web-app-capable" content="yes" />
       </head>
-      <body className="font-sans antialiased">
+      <body className="font-sans antialiased overflow-x-hidden w-full max-w-full">
         <ServiceWorkerRegistrar />
         {children}
       </body>

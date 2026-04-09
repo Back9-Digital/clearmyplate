@@ -67,14 +67,14 @@ function SectionHeading({ title, description }: { title: string; description?: s
 function Row({ label, description, children }: { label: string; description?: string; children: React.ReactNode }) {
   return (
     <div
-      className="flex items-center justify-between gap-6 rounded-2xl bg-white px-5 py-4"
+      className="flex items-center justify-between gap-3 rounded-2xl bg-white px-4 py-4 sm:gap-6 sm:px-5"
       style={{ border: `1px solid ${BORDER}` }}
     >
-      <div>
+      <div className="min-w-0 flex-1">
         <p className="text-sm font-medium" style={{ color: DARK }}>{label}</p>
         {description && <p className="mt-0.5 text-xs" style={{ color: GRAY }}>{description}</p>}
       </div>
-      {children}
+      <div className="shrink-0">{children}</div>
     </div>
   )
 }
@@ -482,7 +482,7 @@ export default function SettingsPage() {
 
       {/* Nav */}
       <header className="border-b bg-white" style={{ borderColor: BORDER }}>
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6 sm:py-4">
           <div className="flex items-center gap-3">
             <Link href="/dashboard">
               <button className="flex items-center gap-1.5 text-sm" style={{ color: GRAY }}>
@@ -497,7 +497,7 @@ export default function SettingsPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-2xl px-6 py-10">
+      <main className="mx-auto max-w-2xl px-4 py-8 sm:px-6 sm:py-10">
         <div className="mb-10">
           <h1 className="text-2xl font-bold" style={{ color: DARK }}>Settings</h1>
           <p className="mt-1 text-sm" style={{ color: GRAY }}>
@@ -524,7 +524,7 @@ export default function SettingsPage() {
                 <select
                   value={timezone}
                   onChange={(e) => setTimezone(e.target.value)}
-                  className="rounded-lg bg-transparent py-1 pl-2 pr-6 text-sm outline-none"
+                  className="max-w-[150px] rounded-lg bg-transparent py-1 pl-2 pr-6 text-sm outline-none sm:max-w-none"
                   style={{ border: `1px solid ${BORDER}`, color: DARK }}
                 >
                   <option value="Pacific/Auckland">Auckland (NZST)</option>

@@ -173,8 +173,8 @@ export default async function Dashboard() {
     return (
       <div className="min-h-screen" style={{ backgroundColor: BG }}>
         <header className="overflow-hidden border-b" style={{ backgroundColor: "white", borderColor: BORDER }}>
-          <div className="mx-auto flex max-w-6xl items-center justify-between px-3 py-3 sm:px-6 sm:py-4">
-            <Image src="/images/Clear My Plate Logo Horizontal Lockup.svg" alt="ClearMyPlate" width={224} height={56} className="h-7 w-auto shrink-0 sm:h-14" unoptimized priority />
+          <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6 sm:py-4">
+            <Image src="/images/Clear My Plate Logo Horizontal Lockup.svg" alt="ClearMyPlate" width={224} height={56} className="h-7 w-auto shrink-0 sm:h-10" unoptimized priority />
             <div className="flex shrink-0 items-center gap-2 sm:gap-3">
               <PushNotificationToggle />
               <span className="text-sm hidden sm:inline" style={{ color: GRAY }}>{user.email}</span>
@@ -189,7 +189,7 @@ export default async function Dashboard() {
           </div>
         </header>
 
-        <main className="mx-auto max-w-6xl px-6 py-10">
+        <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
           {/* Greeting */}
           <div className="mb-6">
             <h1 className="text-2xl font-bold" style={{ color: DARK }}>{greeting} 👋</h1>
@@ -252,13 +252,13 @@ export default async function Dashboard() {
 
       {/* Nav */}
       <header className="border-b" style={{ backgroundColor: "white", borderColor: BORDER }}>
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <img src="/images/Clear My Plate Logo Horizontal Lockup.svg" alt="ClearMyPlate" height="56" style={{ height: 56 }} />
-          <div className="flex items-center gap-3">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6 sm:py-4">
+          <img src="/images/Clear My Plate Logo Horizontal Lockup.svg" alt="ClearMyPlate" className="h-8 w-auto shrink-0 sm:h-10" />
+          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
             <PushNotificationToggle />
             <span className="text-sm hidden sm:inline" style={{ color: GRAY }}>{user.email}</span>
             <div
-              className="flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold text-white"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white"
               style={{ backgroundColor: SAGE }}
             >
               {initial}
@@ -268,7 +268,7 @@ export default async function Dashboard() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl px-6 py-10">
+      <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
 
         {/* Payment success banner */}
         <Suspense fallback={null}>

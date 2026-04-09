@@ -27,7 +27,8 @@ type Meal = {
   portion_notes: string
 }
 
-type GroceryItem = { category: string; name: string; quantity: string; checked: boolean }
+type GroceryItem  = { category: string; name: string; quantity: string; checked: boolean }
+type CustomItem   = { name: string; checked: boolean }
 
 type Plan = {
   plan_id: string | null
@@ -914,6 +915,10 @@ function PlanPageInner() {
   // Grocery sync
   const [ownerProfileId, setOwnerProfileId]     = useState<string | null>(null)
   const saveTimerRef                            = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Custom grocery items
+  const [customItems, setCustomItems]           = useState<CustomItem[]>([])
+  const [newItemText, setNewItemText]           = useState("")
+  const customSaveTimerRef                      = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Load plan on mount
   useEffect(() => {
@@ -952,14 +957,17 @@ function PlanPageInner() {
         if (user) {
           setOwnerProfileId(user.id)
 
-          // Load latest_plan and checked_items from profiles in one query
+          // Load latest_plan, checked_items, and custom_grocery_items from profiles in one query
           const { data: profile } = await supabase
             .from("profiles")
-            .select("latest_plan, checked_items")
+            .select("latest_plan, checked_items, custom_grocery_items")
             .eq("id", user.id)
             .single()
 
           const checkedNames: string[] = profile?.checked_items ?? []
+          if (Array.isArray(profile?.custom_grocery_items)) {
+            setCustomItems(profile.custom_grocery_items as CustomItem[])
+          }
 
           if (profile?.latest_plan) {
             const lp = profile.latest_plan as { plan_id?: string; week_start_date: string; meals: Meal[]; grocery_list: GroceryItem[] }
@@ -984,8 +992,9 @@ function PlanPageInner() {
           const { data: { user: u2 } } = await supabase2.auth.getUser()
           const checkedNames: string[] = []
           if (u2) {
-            const { data: p } = await supabase2.from("profiles").select("checked_items").eq("id", u2.id).single()
+            const { data: p } = await supabase2.from("profiles").select("checked_items, custom_grocery_items").eq("id", u2.id).single()
             checkedNames.push(...(p?.checked_items ?? []))
+            if (Array.isArray(p?.custom_grocery_items)) setCustomItems(p.custom_grocery_items as CustomItem[])
             setOwnerProfileId(u2.id)
           }
           setPlan(applyChecked(rawPlan, checkedNames))
@@ -1107,6 +1116,41 @@ function PlanPageInner() {
     }, 500)
   }, [ownerUserId])
 
+  // ── Custom grocery items ─────────────────────────────────────
+
+  const debouncedSaveCustom = useCallback((items: CustomItem[]) => {
+    if (customSaveTimerRef.current) clearTimeout(customSaveTimerRef.current)
+    customSaveTimerRef.current = setTimeout(async () => {
+      if (viewOnly) return
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        await supabase.from("profiles").update({ custom_grocery_items: items }).eq("id", user.id)
+      }
+    }, 500)
+  }, [viewOnly])
+
+  const addCustomItem = () => {
+    const name = newItemText.trim()
+    if (!name) return
+    const updated = [...customItems, { name, checked: false }]
+    setCustomItems(updated)
+    setNewItemText("")
+    debouncedSaveCustom(updated)
+  }
+
+  const toggleCustomItem = (index: number) => {
+    const updated = customItems.map((item, i) => i === index ? { ...item, checked: !item.checked } : item)
+    setCustomItems(updated)
+    debouncedSaveCustom(updated)
+  }
+
+  const removeCustomItem = (index: number) => {
+    const updated = customItems.filter((_, i) => i !== index)
+    setCustomItems(updated)
+    debouncedSaveCustom(updated)
+  }
+
   // Realtime subscription — updates grocery checkboxes when partner ticks items
   useEffect(() => {
     if (!ownerProfileId) return
@@ -1161,6 +1205,8 @@ function PlanPageInner() {
       if (!res.ok) throw new Error(result?.error ?? "Generation failed")
       localStorage.setItem("cmp_latest_plan", JSON.stringify(result))
       setPlan({ ...result, grocery_list: result.grocery_list.map((g: GroceryItem) => ({ ...g, checked: false })) })
+      setCustomItems([])
+      debouncedSaveCustom([])
       setRegenOpen(false)
       // Offer to save instruction as a preference (non-swap instructions only, <100 chars)
       const trimmed = instructions.trim()
@@ -1182,8 +1228,8 @@ function PlanPageInner() {
     return acc
   }, {})
 
-  const totalItems   = plan?.grocery_list.length ?? 0
-  const checkedItems = plan?.grocery_list.filter((i) => i.checked).length ?? 0
+  const totalItems   = (plan?.grocery_list.length ?? 0) + customItems.length
+  const checkedItems = (plan?.grocery_list.filter((i) => i.checked).length ?? 0) + customItems.filter((i) => i.checked).length
 
   const weekLabel = plan?.week_start_date
     ? new Date(plan.week_start_date).toLocaleDateString("en-NZ", { day: "numeric", month: "short", year: "numeric" })
@@ -1569,6 +1615,9 @@ function PlanPageInner() {
                     onClick={() => {
                       setPlan((p) => p ? { ...p, grocery_list: p.grocery_list.map((i) => ({ ...i, checked: false })) } : p)
                       debouncedSaveChecked([])
+                      const uncheckedCustom = customItems.map((i) => ({ ...i, checked: false }))
+                      setCustomItems(uncheckedCustom)
+                      debouncedSaveCustom(uncheckedCustom)
                     }}
                   >
                     Clear all
@@ -1630,6 +1679,80 @@ function PlanPageInner() {
                     </div>
                     )
                   })}
+
+                  {/* Your extras */}
+                  {(customItems.length > 0 || !viewOnly) && (
+                    <div>
+                      <p className="mb-3 text-xs font-semibold uppercase tracking-widest" style={{ color: GRAY }}>Your extras</p>
+
+                      {customItems.length > 0 && (
+                        <div className="mb-3 overflow-hidden rounded-2xl bg-white" style={{ border: `1px solid ${BORDER}` }}>
+                          {customItems.map((item, idx) => (
+                            <div
+                              key={idx}
+                              className="flex w-full items-center gap-3 px-5 py-4"
+                              style={idx > 0 ? { borderTop: `1px solid ${BORDER}` } : {}}
+                            >
+                              <button
+                                onClick={() => toggleCustomItem(idx)}
+                                className="flex h-5 w-5 shrink-0 items-center justify-center rounded transition-colors"
+                                style={{
+                                  backgroundColor: item.checked ? SAGE : "white",
+                                  border: `1.5px solid ${item.checked ? SAGE : BORDER}`,
+                                }}
+                              >
+                                {item.checked && (
+                                  <svg className="h-3 w-3 text-white" viewBox="0 0 12 12" fill="none">
+                                    <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                  </svg>
+                                )}
+                              </button>
+                              <span
+                                className="flex-1 text-sm"
+                                style={{ color: item.checked ? GRAY : DARK, textDecoration: item.checked ? "line-through" : "none" }}
+                              >
+                                {item.name}
+                              </span>
+                              {!viewOnly && (
+                                <button
+                                  onClick={() => removeCustomItem(idx)}
+                                  className="shrink-0 rounded-full p-1 transition-colors"
+                                  style={{ color: GRAY }}
+                                  title="Remove item"
+                                >
+                                  <X className="h-3.5 w-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {!viewOnly && (
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={newItemText}
+                            onChange={(e) => setNewItemText(e.target.value)}
+                            onKeyDown={(e) => e.key === "Enter" && addCustomItem()}
+                            placeholder="e.g. pet food, toilet paper…"
+                            className="flex-1 rounded-2xl bg-white px-4 py-3 text-sm outline-none"
+                            style={{ border: `1.5px solid ${BORDER}`, color: DARK }}
+                            onFocus={(e) => (e.target.style.borderColor = SAGE)}
+                            onBlur={(e) => (e.target.style.borderColor = BORDER)}
+                          />
+                          <button
+                            onClick={addCustomItem}
+                            disabled={!newItemText.trim()}
+                            className="shrink-0 rounded-full px-5 py-3 text-sm font-semibold text-white transition-all disabled:opacity-40"
+                            style={{ backgroundColor: SAGE }}
+                          >
+                            Add
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </>
             )}

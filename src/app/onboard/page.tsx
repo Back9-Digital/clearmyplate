@@ -6,6 +6,7 @@ import Link from "next/link"
 import Image from "next/image"
 import { Check, ChevronLeft, Plus, Minus, Users, Zap, Leaf } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { GeneratingOverlay } from "@/components/GeneratingOverlay"
 
 const SAGE     = "#4A7C6F"
 const BG       = "#F5F3EE"
@@ -314,6 +315,7 @@ export default function Onboard() {
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: BG }}>
+      {loading && <GeneratingOverlay />}
       <div className="mx-auto w-full max-w-lg px-4 pb-24 pt-10 sm:px-6">
 
         {/* Header */}
@@ -691,20 +693,6 @@ export default function Onboard() {
                 </p>
               )}
 
-              {/* Loading state */}
-              {loading && (
-                <div
-                  className="mt-6 flex flex-col items-center gap-3 rounded-2xl px-6 py-8"
-                  style={{ backgroundColor: ACCENT }}
-                >
-                  <div
-                    className="h-8 w-8 animate-spin rounded-full border-2 border-transparent"
-                    style={{ borderTopColor: SAGE, borderRightColor: SAGE }}
-                  />
-                  <p className="text-sm font-medium" style={{ color: SAGE }}>Clearing your plate…</p>
-                  <p className="text-xs text-center" style={{ color: GRAY }}>Building your personalised week. This takes around 20 seconds.</p>
-                </div>
-              )}
             </div>
           )}
         </div>

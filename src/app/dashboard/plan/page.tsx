@@ -5,6 +5,7 @@ import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { RefreshCw, Heart, ArrowLeft, Shuffle, X, BookOpen, Clock, Users, ChevronRight, Eye } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { GeneratingOverlay } from "@/components/GeneratingOverlay"
 
 const SAGE     = "#4A7C6F"
 const BG       = "#F5F3EE"
@@ -643,6 +644,7 @@ function PlanPageInner() {
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: BG }}>
+      {regenLoading && <GeneratingOverlay />}
       {regenOpen && (
         <RegenModal
           onClose={() => setRegenOpen(false)}

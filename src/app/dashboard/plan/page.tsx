@@ -333,18 +333,32 @@ function RecipeDrawer({
 
               {/* ── Ingredients (Feature 1: checklist + concertina) ── */}
               <div>
-                {/* Section header — tappable to re-expand */}
+                {/* Section header — chevron toggles open/closed */}
                 <button
-                  className="mb-3 flex w-full items-center justify-between"
+                  className="mb-3 flex w-full items-center gap-1.5"
                   onClick={() => setIngredientsOpen((v) => !v)}
                 >
+                  {/* Rotating chevron */}
+                  <ChevronRight
+                    className="h-4 w-4 shrink-0 transition-transform duration-300"
+                    style={{
+                      color: SAGE,
+                      transform: ingredientsOpen ? "rotate(90deg)" : "rotate(0deg)",
+                    }}
+                  />
                   <h3 className="text-sm font-semibold uppercase tracking-widest" style={{ color: DARK }}>
                     Ingredients
                   </h3>
-                  {allIngredientsChecked && !ingredientsOpen ? (
+                  <span className="flex-1" />
+                  {/* Right-side hint text */}
+                  {!ingredientsOpen && allIngredientsChecked ? (
                     <span className="text-xs font-medium" style={{ color: SAGE }}>All ingredients ready ✓ tap to expand</span>
+                  ) : !ingredientsOpen ? (
+                    <span className="text-xs" style={{ color: GRAY }}>
+                      ({recipe.ingredients.length}) tap to expand
+                    </span>
                   ) : allIngredientsChecked ? (
-                    <span className="text-xs font-medium" style={{ color: SAGE }}>All ingredients ready ✓</span>
+                    <span className="text-xs font-medium" style={{ color: SAGE }}>All ready ✓</span>
                   ) : (
                     <span className="text-xs tabular-nums" style={{ color: GRAY }}>
                       {checkedIngredients.filter(Boolean).length}/{recipe.ingredients.length}

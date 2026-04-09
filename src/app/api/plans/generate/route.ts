@@ -347,84 +347,8 @@ export async function POST(req: NextRequest) {
       url:   "/dashboard/plan",
     }).catch(() => {})
 
-    // Attempt to save plan to Supabase — non-fatal if tables don't exist yet
-    let savedPlanId: string | null = null
-    try {
-      if (user) {
-        const { data: profile } = await supabase
-          .from("household_profiles")
-          .select("id")
-          .eq("user_id", user.id)
-          .single()
-
-        if (profile) {
-          const householdTypes: string[] = Array.isArray(body.household_type) && body.household_type.length
-            ? body.household_type
-            : ["mixed_household"]
-
-          // Upsert preferences (including household_type if column exists)
-          await supabase.from("preferences").upsert({
-            household_id: profile.id,
-            goal: body.goal,
-            budget_weekly_nzd: body.budget ?? 200,
-            will_eat: body.will_eat ?? [],
-            wont_eat: body.wont_eat ? [body.wont_eat] : [],
-            pref_use_leftovers: body.use_leftovers ?? true,
-            household_type: householdTypes,
-          }, { onConflict: "household_id" })
-
-          // Save plan
-          const preferencesSnapshot = {
-            goal: body.goal,
-            household_type: householdTypes,
-            adults: body.adults,
-            kids: body.kids,
-            budget: body.budget,
-            will_eat: body.will_eat,
-            wont_eat: body.wont_eat,
-            use_leftovers: body.use_leftovers,
-            vegetarian_night: body.vegetarian_night,
-            keep_simple: body.keep_simple,
-          }
-
-          const { data: plan } = await supabase
-            .from("plans")
-            .insert({
-              household_id: profile.id,
-              week_start_date: parsed.week_start_date,
-              status: "active",
-              preferences_snapshot: preferencesSnapshot,
-            })
-            .select()
-            .single()
-
-          if (plan) {
-            savedPlanId = plan.id
-
-            // Save plan items
-            const items = parsed.meals.map((meal) => ({
-              plan_id: plan.id,
-              day_of_week: meal.day_of_week,
-              meal_type: meal.meal_type,
-              meal_name: meal.meal_name,
-              description: meal.description,
-              key_ingredients: meal.key_ingredients,
-              // Store extra fields in key_ingredients metadata via description extension
-            }))
-            await supabase.from("plan_items").insert(items)
-
-            // Save grocery list
-            await supabase.from("grocery_lists").insert({
-              plan_id: plan.id,
-              household_id: profile.id,
-              items: parsed.grocery_list,
-            })
-          }
-        }
-      }
-    } catch {
-      // Supabase save failed — still return the plan
-    }
+    // Plan is saved to profiles.latest_plan below — no legacy tables needed
+    const savedPlanId: string | null = null
 
     // Save generations count + latest_plan to profile (after savedPlanId is resolved above)
     console.log("[generate] saving latest_plan for user:", user.id, "savedPlanId:", savedPlanId)

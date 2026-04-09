@@ -895,30 +895,25 @@ function PlanPageInner() {
         if (user) {
           setOwnerProfileId(user.id)
 
-          // Load checked_items alongside plan
-          const [profilesRes, householdRes] = await Promise.all([
-            supabase.from("profiles").select("checked_items").eq("id", user.id).single(),
-            supabase.from("household_profiles").select("id").eq("user_id", user.id).single(),
-          ])
-          const checkedNames: string[] = profilesRes.data?.checked_items ?? []
+          // Load latest_plan and checked_items from profiles in one query
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("latest_plan, checked_items")
+            .eq("id", user.id)
+            .single()
 
-          const householdProfile = householdRes.data
-          if (householdProfile) {
-            const { data: dbPlan } = await supabase
-              .from("plans")
-              .select(`id, week_start_date, plan_items(*), grocery_lists(items)`)
-              .eq("household_id", householdProfile.id)
-              .order("created_at", { ascending: false })
-              .limit(1)
-              .single()
+          const checkedNames: string[] = profile?.checked_items ?? []
 
-            if (dbPlan && dbPlan.plan_items?.length) {
-              const meals = (dbPlan.plan_items as Meal[]).sort((a, b) => a.day_of_week - b.day_of_week)
-              const groceryRaw = (dbPlan.grocery_lists as { items: GroceryItem[] }[])[0]?.items ?? []
-              const rawPlan: Plan = { plan_id: dbPlan.id, week_start_date: dbPlan.week_start_date, meals, grocery_list: groceryRaw.map((g) => ({ ...g, checked: false })) }
-              setPlan(applyChecked(rawPlan, checkedNames))
-              return
+          if (profile?.latest_plan) {
+            const lp = profile.latest_plan as { plan_id?: string; week_start_date: string; meals: Meal[]; grocery_list: GroceryItem[] }
+            const rawPlan: Plan = {
+              plan_id: lp.plan_id ?? null,
+              week_start_date: lp.week_start_date,
+              meals: lp.meals,
+              grocery_list: lp.grocery_list.map((g) => ({ ...g, checked: false })),
             }
+            setPlan(applyChecked(rawPlan, checkedNames))
+            return
           }
         }
 

@@ -90,7 +90,7 @@ Respond with exactly this JSON structure:
 
     // Save to cache (non-fatal)
     try {
-      await supabase.from("meal_recipes").insert({ meal_name, recipe_json: recipe })
+      await supabase.from("meal_recipes").insert({ meal_name, recipe_json: recipe, user_id: user.id })
     } catch {
       // Cache save failed — still return recipe
     }

@@ -220,7 +220,7 @@ export async function POST(req: NextRequest) {
 
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
-      .select("plan_type, generations_this_week, week_reset_at, calorie_target, macro_protein, macro_carbs, macro_fat, family_members, allergies")
+      .select("plan_type, generations_this_week, week_reset_at, calorie_target, macro_protein, macro_carbs, macro_fat, family_members, allergies, goal, household_adults, household_kids, weekly_budget, will_eat, wont_eat, use_leftovers, vegetarian_night, keep_simple")
       .eq("id", user.id)
       .single()
 
@@ -290,13 +290,25 @@ export async function POST(req: NextRequest) {
       messages: [{ role: "user", content: buildPrompt({
         ...body,
         meal_preferences: mealPrefsData ?? [],
-        calorie_target:   profile.calorie_target  ?? null,
-        macro_protein:    profile.macro_protein   ?? null,
-        macro_carbs:      profile.macro_carbs     ?? null,
-        macro_fat:        profile.macro_fat       ?? null,
-        // Profile-stored — override any client-sent values with the saved ones
-        family_members:   profile.family_members  ?? [],
-        allergies:        profile.allergies        ?? (Array.isArray(body.allergies) ? body.allergies : []),
+        calorie_target:   profile.calorie_target ?? null,
+        macro_protein:    profile.macro_protein  ?? null,
+        macro_carbs:      profile.macro_carbs    ?? null,
+        macro_fat:        profile.macro_fat      ?? null,
+        family_members:   profile.family_members ?? [],
+        allergies:        profile.allergies      ?? (Array.isArray(body.allergies) ? body.allergies : []),
+        // Preference columns — use profile when explicitly saved (will_eat !== null is the sentinel),
+        // otherwise fall back to request body (e.g. first onboarding generate, or API callers)
+        ...(profile.will_eat !== null ? {
+          goal:             profile.goal             ?? body.goal,
+          adults:           profile.household_adults != null ? profile.household_adults : body.adults,
+          kids:             profile.household_kids   != null ? profile.household_kids   : body.kids,
+          budget:           profile.weekly_budget    ?? body.budget,
+          will_eat:         profile.will_eat,
+          wont_eat:         profile.wont_eat         ?? body.wont_eat,
+          use_leftovers:    profile.use_leftovers,
+          vegetarian_night: profile.vegetarian_night,
+          keep_simple:      profile.keep_simple,
+        } : {}),
       }) }],
     })
 
@@ -325,17 +337,9 @@ export async function POST(req: NextRequest) {
       parsed = JSON.parse(cleaned)
     }
 
-    // Persist allergies from onboarding payload if not already saved in profile
-    const allergiesToSave = Array.isArray(body.allergies) && body.allergies.length && !profile.allergies
-      ? body.allergies
-      : undefined
-
     await supabase
       .from("profiles")
-      .update({
-        generations_this_week: currentUsed + 1,
-        ...(allergiesToSave ? { allergies: allergiesToSave } : {}),
-      })
+      .update({ generations_this_week: currentUsed + 1 })
       .eq("id", user.id)
 
     // Non-blocking GHL tag + push after successful generation

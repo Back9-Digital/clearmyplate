@@ -208,7 +208,7 @@ export default function SettingsPage() {
       if (!user) return
       supabase
         .from("profiles")
-        .select("calorie_target, macro_protein, macro_carbs, macro_fat, plan_type, generations_this_week, week_reset_at, family_members, allergies")
+        .select("calorie_target, macro_protein, macro_carbs, macro_fat, plan_type, generations_this_week, week_reset_at, family_members, allergies, goal, weekly_budget, will_eat, wont_eat, use_leftovers, vegetarian_night, keep_simple")
         .eq("id", user.id)
         .single()
         .then(({ data, error }) => {
@@ -243,6 +243,15 @@ export default function SettingsPage() {
             setAllergies(known)
             setOtherAllergies(unknown.join(", "))
           }
+
+          // Preferences
+          if (data.goal)                  setGoal(data.goal as "maintain" | "build_muscle" | "lose_weight")
+          if (data.weekly_budget != null) setBudget(data.weekly_budget)
+          if (Array.isArray(data.will_eat) && data.will_eat.length) setWillEat(data.will_eat as string[])
+          if (data.wont_eat != null)      setWontEat(data.wont_eat)
+          if (data.use_leftovers != null)    setUseLeftovers(data.use_leftovers)
+          if (data.vegetarian_night != null) setVegetarianNight(data.vegetarian_night)
+          if (data.keep_simple != null)      setKeepSimple(data.keep_simple)
 
           setLoading(false)
         })
@@ -360,12 +369,21 @@ export default function SettingsPage() {
       await supabase
         .from("profiles")
         .update({
-          calorie_target: advancedEnabled ? calorieTarget : null,
-          macro_protein:  advancedEnabled ? macroProtein  : null,
-          macro_carbs:    advancedEnabled ? macroCarbs    : null,
-          macro_fat:      advancedEnabled ? macroFat      : null,
-          family_members: familyMembers.filter((m) => m.name.trim()),
-          allergies:      allAllergies.length ? allAllergies : null,
+          calorie_target:   advancedEnabled ? calorieTarget : null,
+          macro_protein:    advancedEnabled ? macroProtein  : null,
+          macro_carbs:      advancedEnabled ? macroCarbs    : null,
+          macro_fat:        advancedEnabled ? macroFat      : null,
+          family_members:   familyMembers.filter((m) => m.name.trim()),
+          allergies:        allAllergies.length ? allAllergies : null,
+          goal,
+          household_adults: adults,
+          household_kids:   kids,
+          weekly_budget:    budget,
+          will_eat:         willEat.length ? willEat : [],
+          wont_eat:         wontEat || null,
+          use_leftovers:    useLeftovers,
+          vegetarian_night: vegetarianNight,
+          keep_simple:      keepSimple,
         })
         .eq("id", user.id)
 

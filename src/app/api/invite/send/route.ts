@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { ghlAddTags } from "@/lib/ghl"
+import { sendInviteEmail } from "@/lib/sendgrid"
 
 export const dynamic = "force-dynamic"
 
@@ -34,18 +35,31 @@ export async function POST(req: NextRequest) {
   const { data: invite, error } = await supabase
     .from("household_invites")
     .insert({ household_id: user.id, email })
-    .select("id, email, created_at")
+    .select("id, email, created_at, token")
     .single()
 
   if (error) {
     console.error("[invite/send] DB error:", error)
-    // Friendly message for duplicate invite
     const msg = error.code === "23505" ? "An invite for that email already exists." : "Failed to create invite."
     return NextResponse.json({ error: msg }, { status: 500 })
   }
 
-  // Non-blocking — tag the invitee in GHL so the email sequence can fire
-  ghlAddTags(email, ["household-invite"]).catch(() => {})
+  // Send invite email first — must happen before any other side-effects
+  console.log("[invite] sending email to:", email, "token:", invite.token)
+  try {
+    await sendInviteEmail(email, invite.token)
+    console.log("[invite] SendGrid email sent successfully")
+  } catch (err: unknown) {
+    const sgErr = (err as { response?: { body?: unknown } })?.response?.body
+    console.error("[invite/send] SendGrid error:", sgErr ?? err)
+  }
+
+  // GHL tag for CRM tracking only — isolated so it can never affect email sending
+  try {
+    await ghlAddTags(email, ["household-invite"])
+  } catch {
+    // Non-critical — ignore GHL failures
+  }
 
   return NextResponse.json({ invite })
 }

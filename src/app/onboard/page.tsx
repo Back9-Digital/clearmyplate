@@ -272,6 +272,35 @@ export default function Onboard() {
         }
       }
 
+      // Persist onboarding preferences to profile (non-blocking)
+      const supabase = createClient()
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        const u = session?.user
+        if (!u) return
+        const allAllergies = [
+          ...data.allergies,
+          ...data.other_allergies.split(",").map((s) => s.trim()).filter(Boolean),
+        ]
+        supabase
+          .from("profiles")
+          .update({
+            goal:             data.goal,
+            household_adults: data.adults,
+            household_kids:   data.kids,
+            weekly_budget:    data.budget ?? 200,
+            will_eat:         data.will_eat.length ? data.will_eat : [],
+            wont_eat:         data.wont_eat || null,
+            use_leftovers:    data.use_leftovers,
+            vegetarian_night: data.vegetarian_night,
+            keep_simple:      data.keep_simple,
+            allergies:        allAllergies.length ? allAllergies : null,
+          })
+          .eq("id", u.id)
+          .then(({ error }) => {
+            if (error) console.error("[onboard] prefs save error:", error.message)
+          })
+      })
+
       router.push("/dashboard/plan")
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Something went wrong"

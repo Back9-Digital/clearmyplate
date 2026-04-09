@@ -50,7 +50,7 @@ Context:
 - Serves: ${serves} (${adults} adult${adults !== 1 ? "s" : ""}${kids > 0 ? `, ${kids} kid${kids !== 1 ? "s" : ""}` : ""})
 - Household goal: ${goal}
 
-Use NZ-available ingredients and metric measurements. Write steps clearly enough for a beginner home cook. Keep it practical and achievable on a weeknight.
+Use NZ-available ingredients and metric measurements. Write steps clearly enough for a beginner home cook. Keep it practical and achievable on a weeknight. For herbs, always specify fresh amount AND dried alternative e.g. "1 tbsp fresh rosemary (or 1 tsp dried)".
 
 Respond with exactly this JSON structure:
 {

@@ -97,7 +97,49 @@ function RecipeSkeleton() {
   )
 }
 
+// ── Recipe utilities ─────────────────────────────────────────
+
+function extractMinutes(text: string): number | null {
+  const range = text.match(/(\d+)\s*[-–]\s*(\d+)\s*(?:minutes?|mins?)/i)
+  if (range) return Math.round((parseInt(range[1]) + parseInt(range[2])) / 2)
+  const single = text.match(/(\d+)\s*(?:minutes?|mins?)/i)
+  if (single) return parseInt(single[1])
+  const hours = text.match(/(\d+)\s*hours?/i)
+  if (hours) return parseInt(hours[1]) * 60
+  return null
+}
+
+function formatTime(secs: number): string {
+  const m = Math.floor(secs / 60)
+  const s = secs % 60
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
+}
+
+function playBeep() {
+  try {
+    const ctx = new AudioContext()
+    const osc = ctx.createOscillator()
+    const gain = ctx.createGain()
+    osc.connect(gain)
+    gain.connect(ctx.destination)
+    osc.type = "sine"
+    osc.frequency.value = 880
+    gain.gain.setValueAtTime(0.4, ctx.currentTime)
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.8)
+    osc.start(ctx.currentTime)
+    osc.stop(ctx.currentTime + 0.8)
+  } catch { /* AudioContext unavailable */ }
+}
+
 // ── Recipe Drawer ────────────────────────────────────────────
+type ActiveTimer = {
+  id: string
+  label: string
+  totalSecs: number
+  remaining: number
+  done: boolean
+}
+
 function RecipeDrawer({
   meal,
   onClose,
@@ -108,6 +150,42 @@ function RecipeDrawer({
   const [recipe, setRecipe]   = useState<Recipe | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState<string | null>(null)
+
+  // Feature 1 — ingredient checklist
+  const [checkedIngredients, setCheckedIngredients] = useState<boolean[]>([])
+  const [ingredientsOpen, setIngredientsOpen]       = useState(true)
+
+  // Feature 2 — step cooking mode
+  const [completedSteps, setCompletedSteps] = useState<boolean[]>([])
+
+  // Feature 3 — timers
+  const [timers, setTimers] = useState<ActiveTimer[]>([])
+
+  // Initialise local checkbox state when recipe loads
+  useEffect(() => {
+    if (!recipe) return
+    setCheckedIngredients(new Array(recipe.ingredients.length).fill(false))
+    setCompletedSteps(new Array(recipe.steps.length).fill(false))
+  }, [recipe])
+
+  // Timer tick — runs once, drives all active timers
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTimers((prev) => {
+        if (!prev.some((t) => !t.done)) return prev
+        return prev.map((t) => {
+          if (t.done) return t
+          const remaining = t.remaining - 1
+          if (remaining <= 0) {
+            playBeep()
+            return { ...t, remaining: 0, done: true }
+          }
+          return { ...t, remaining }
+        })
+      })
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [])
 
   useEffect(() => {
     async function fetchRecipe() {
@@ -124,8 +202,7 @@ function RecipeDrawer({
           }),
         })
         if (!res.ok) throw new Error("Failed to fetch recipe")
-        const data = await res.json()
-        setRecipe(data)
+        setRecipe(await res.json())
       } catch {
         setError("Couldn't load the recipe — please try again.")
       } finally {
@@ -135,11 +212,38 @@ function RecipeDrawer({
     fetchRecipe()
   }, [meal.meal_name])
 
-  // Prevent body scroll when open
   useEffect(() => {
     document.body.style.overflow = "hidden"
     return () => { document.body.style.overflow = "" }
   }, [])
+
+  const allIngredientsChecked = checkedIngredients.length > 0 && checkedIngredients.every(Boolean)
+  const currentStep = completedSteps.findIndex((v) => !v) // -1 = all done
+
+  const toggleIngredient = (i: number) => {
+    const next = checkedIngredients.map((v, idx) => idx === i ? !v : v)
+    setCheckedIngredients(next)
+    if (next.every(Boolean)) {
+      setTimeout(() => setIngredientsOpen(false), 300)
+    }
+  }
+
+  const toggleStep = (i: number) =>
+    setCompletedSteps((prev) => prev.map((v, idx) => idx === i ? !v : v))
+
+  const startTimer = (stepIndex: number, mins: number, stepText: string) => {
+    const label = `Step ${stepIndex + 1}: ${stepText.length > 28 ? stepText.slice(0, 28) + "…" : stepText}`
+    setTimers((prev) => [
+      ...prev,
+      { id: `${Date.now()}-${stepIndex}`, label, totalSecs: mins * 60, remaining: mins * 60, done: false },
+    ])
+  }
+
+  const snoozeTimer = (id: string) =>
+    setTimers((prev) => prev.map((t) => t.id === id ? { ...t, remaining: 120, done: false } : t))
+
+  const dismissTimer = (id: string) =>
+    setTimers((prev) => prev.filter((t) => t.id !== id))
 
   return (
     <>
@@ -194,7 +298,7 @@ function RecipeDrawer({
             <div className="px-6 py-5 pb-10 space-y-7">
 
               {/* Stats row */}
-              <div className="flex gap-5">
+              <div className="flex gap-5 flex-wrap">
                 <div className="flex items-center gap-1.5">
                   <Clock className="h-4 w-4 shrink-0" style={{ color: SAGE }} />
                   <span className="text-sm" style={{ color: GRAY }}>
@@ -211,47 +315,165 @@ function RecipeDrawer({
                 </div>
               </div>
 
-              {/* Ingredients */}
+              {/* ── Ingredients (Feature 1: checklist + concertina) ── */}
               <div>
-                <h3 className="mb-3 text-sm font-semibold uppercase tracking-widest" style={{ color: DARK }}>
-                  Ingredients
-                </h3>
-                <div className="rounded-2xl overflow-hidden" style={{ border: `1px solid ${BORDER}` }}>
-                  {recipe.ingredients.map((ing, i) => (
-                    <div
-                      key={i}
-                      className="flex items-baseline justify-between px-4 py-3"
-                      style={i > 0 ? { borderTop: `1px solid ${BORDER}` } : {}}
-                    >
-                      <div>
-                        <span className="text-sm font-medium" style={{ color: DARK }}>{ing.name}</span>
-                        {ing.notes && (
-                          <span className="ml-2 text-xs" style={{ color: GRAY }}>{ing.notes}</span>
-                        )}
-                      </div>
-                      <span className="ml-4 shrink-0 text-sm" style={{ color: GRAY }}>{ing.quantity}</span>
-                    </div>
-                  ))}
+                {/* Section header — tappable to re-expand */}
+                <button
+                  className="mb-3 flex w-full items-center justify-between"
+                  onClick={() => setIngredientsOpen((v) => !v)}
+                >
+                  <h3 className="text-sm font-semibold uppercase tracking-widest" style={{ color: DARK }}>
+                    Ingredients
+                  </h3>
+                  {allIngredientsChecked && !ingredientsOpen ? (
+                    <span className="text-xs font-medium" style={{ color: SAGE }}>All ingredients ready ✓ tap to expand</span>
+                  ) : allIngredientsChecked ? (
+                    <span className="text-xs font-medium" style={{ color: SAGE }}>All ingredients ready ✓</span>
+                  ) : (
+                    <span className="text-xs tabular-nums" style={{ color: GRAY }}>
+                      {checkedIngredients.filter(Boolean).length}/{recipe.ingredients.length}
+                    </span>
+                  )}
+                </button>
+
+                {/* Concertina wrapper */}
+                <div
+                  style={{
+                    maxHeight: ingredientsOpen ? "2000px" : "0",
+                    overflow: "hidden",
+                    transition: "max-height 400ms ease",
+                  }}
+                >
+                  <div className="rounded-2xl overflow-hidden" style={{ border: `1px solid ${BORDER}` }}>
+                    {recipe.ingredients.map((ing, i) => {
+                      const checked = checkedIngredients[i] ?? false
+                      return (
+                        <button
+                          key={i}
+                          onClick={() => toggleIngredient(i)}
+                          className="flex w-full items-start justify-between px-4 py-3 text-left transition-colors"
+                          style={i > 0 ? { borderTop: `1px solid ${BORDER}` } : {}}
+                        >
+                          <div className="flex items-start gap-3 flex-1 min-w-0">
+                            {/* Checkbox */}
+                            <div
+                              className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded"
+                              style={{
+                                border: `1.5px solid ${checked ? SAGE : BORDER}`,
+                                backgroundColor: checked ? SAGE : "white",
+                                transition: "background-color 0.15s, border-color 0.15s",
+                              }}
+                            >
+                              {checked && (
+                                <svg width="8" height="6" viewBox="0 0 8 6" fill="none">
+                                  <path d="M1 3l2 2 4-4" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                                </svg>
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <span
+                                className="text-sm font-medium"
+                                style={{
+                                  color: checked ? GRAY : DARK,
+                                  textDecoration: checked ? "line-through" : "none",
+                                  transition: "color 0.15s",
+                                }}
+                              >
+                                {ing.name}
+                              </span>
+                              {/* Feature 5: herb/spice alternatives in muted text */}
+                              {ing.notes && (
+                                <p className="text-xs mt-0.5 leading-snug" style={{ color: GRAY }}>{ing.notes}</p>
+                              )}
+                            </div>
+                          </div>
+                          <span
+                            className="ml-3 shrink-0 text-sm"
+                            style={{ color: checked ? GRAY : GRAY, textDecoration: checked ? "line-through" : "none" }}
+                          >
+                            {ing.quantity}
+                          </span>
+                        </button>
+                      )
+                    })}
+                  </div>
                 </div>
               </div>
 
-              {/* Steps */}
+              {/* ── Method (Feature 2: step-by-step mode + Feature 3: timers) ── */}
               <div>
-                <h3 className="mb-3 text-sm font-semibold uppercase tracking-widest" style={{ color: DARK }}>
-                  Method
-                </h3>
-                <ol className="space-y-4">
-                  {recipe.steps.map((step, i) => (
-                    <li key={i} className="flex gap-3">
-                      <span
-                        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white"
-                        style={{ backgroundColor: SAGE }}
+                <div className="mb-3 flex items-center justify-between">
+                  <h3 className="text-sm font-semibold uppercase tracking-widest" style={{ color: DARK }}>
+                    Method
+                  </h3>
+                  {currentStep === -1 && completedSteps.length > 0 && (
+                    <span className="text-xs font-medium" style={{ color: SAGE }}>All steps done ✓</span>
+                  )}
+                </div>
+                <ol className="space-y-3">
+                  {recipe.steps.map((step, i) => {
+                    const done    = completedSteps[i] ?? false
+                    const isCurrent = i === currentStep
+                    const isPast  = currentStep !== -1 && i < currentStep
+                    const mins    = extractMinutes(step)
+                    const alreadyTimered = timers.some((t) => t.id.endsWith(`-${i}`))
+
+                    return (
+                      <li
+                        key={i}
+                        className="rounded-xl transition-all"
+                        style={{
+                          borderLeft: isCurrent ? `3px solid ${SAGE}` : "3px solid transparent",
+                          paddingLeft: isCurrent ? "12px" : "0",
+                          opacity: isPast ? 0.45 : 1,
+                          transition: "opacity 0.2s, border-left-color 0.2s, padding-left 0.2s",
+                        }}
                       >
-                        {i + 1}
-                      </span>
-                      <p className="text-sm leading-relaxed pt-0.5" style={{ color: DARK }}>{step}</p>
-                    </li>
-                  ))}
+                        <div
+                          className="flex gap-3 cursor-pointer select-none"
+                          onClick={() => toggleStep(i)}
+                        >
+                          <span
+                            className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold transition-all"
+                            style={{
+                              backgroundColor: done ? ACCENT : isCurrent ? SAGE : MUTED_BG,
+                              color: done ? SAGE : isCurrent ? "white" : GRAY,
+                            }}
+                          >
+                            {done ? "✓" : i + 1}
+                          </span>
+                          <p
+                            className="leading-relaxed pt-0.5 flex-1"
+                            style={{
+                              fontSize: isCurrent ? "0.9375rem" : "0.875rem",
+                              color: done ? GRAY : DARK,
+                              textDecoration: done ? "line-through" : "none",
+                              transition: "font-size 0.2s, color 0.2s",
+                            }}
+                          >
+                            {step}
+                          </p>
+                        </div>
+                        {/* Timer button */}
+                        {mins !== null && !done && (
+                          <div className="mt-2 ml-9">
+                            <button
+                              onClick={() => alreadyTimered ? null : startTimer(i, mins, step)}
+                              disabled={alreadyTimered}
+                              className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-all disabled:opacity-50"
+                              style={{
+                                backgroundColor: alreadyTimered ? MUTED_BG : ACCENT,
+                                color: SAGE,
+                                border: `1px solid ${SAGE}30`,
+                              }}
+                            >
+                              ⏱️ {alreadyTimered ? "Timer running" : `Start ${mins} min timer`}
+                            </button>
+                          </div>
+                        )}
+                      </li>
+                    )
+                  })}
                 </ol>
               </div>
 
@@ -278,6 +500,48 @@ function RecipeDrawer({
             </div>
           ) : null}
         </div>
+
+        {/* ── Feature 3: Floating timer bar (inside drawer, above scroll) ── */}
+        {timers.length > 0 && (
+          <div
+            className="shrink-0 space-y-2 px-4 py-3"
+            style={{ borderTop: `1px solid ${BORDER}` }}
+          >
+            {timers.map((timer) => (
+              <div
+                key={timer.id}
+                className="flex items-center gap-2 rounded-xl px-3 py-2"
+                style={{
+                  backgroundColor: timer.done ? "#FEE2E2" : ACCENT,
+                  border: `1px solid ${timer.done ? "#FECACA" : SAGE + "30"}`,
+                }}
+              >
+                <span className="text-sm" style={{ color: SAGE }}>{timer.done ? "⏰" : "⏱️"}</span>
+                <span className="flex-1 truncate text-xs font-medium" style={{ color: DARK }}>
+                  {timer.label}
+                </span>
+                <span
+                  className="shrink-0 text-sm font-mono font-bold tabular-nums"
+                  style={{ color: timer.done ? "#B91C1C" : SAGE }}
+                >
+                  {timer.done ? "Done!" : formatTime(timer.remaining)}
+                </span>
+                {timer.done && (
+                  <button
+                    onClick={() => snoozeTimer(timer.id)}
+                    className="shrink-0 rounded-full px-2 py-0.5 text-xs font-medium"
+                    style={{ backgroundColor: "#FEE2E2", color: "#B91C1C", border: "1px solid #FECACA" }}
+                  >
+                    +2m
+                  </button>
+                )}
+                <button onClick={() => dismissTimer(timer.id)} className="shrink-0">
+                  <X className="h-3.5 w-3.5" style={{ color: GRAY }} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </>
   )
@@ -700,6 +964,7 @@ function PlanPageInner() {
   }, [])
 
   const toggleChecked = (name: string) => {
+    console.log("[grocery] toggle:", name)
     setPlan((prev) => {
       if (!prev) return prev
       const updated = prev.grocery_list.map((i) => i.name === name ? { ...i, checked: !i.checked } : i)
@@ -757,21 +1022,36 @@ function PlanPageInner() {
   const debouncedSaveChecked = useCallback((checkedNames: string[]) => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
     saveTimerRef.current = setTimeout(async () => {
+      console.log("[grocery] saving checked items:", checkedNames)
       try {
         if (ownerUserId) {
           // Member: write to owner's profile via API route (bypasses RLS)
-          await fetch("/api/household/checked", {
+          const res = await fetch("/api/household/checked", {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ owner_id: ownerUserId, checked_items: checkedNames }),
           })
+          if (!res.ok) {
+            const body = await res.json().catch(() => ({}))
+            console.error("[grocery] member PATCH failed:", res.status, body)
+          } else {
+            console.log("[grocery] member PATCH ok")
+          }
         } else {
           // Owner: write directly to own profile
           const supabase = createClient()
           const { data: { user } } = await supabase.auth.getUser()
-          if (user) await supabase.from("profiles").update({ checked_items: checkedNames }).eq("id", user.id)
+          if (user) {
+            const { error } = await supabase.from("profiles").update({ checked_items: checkedNames }).eq("id", user.id)
+            if (error) console.error("[grocery] owner update error:", error)
+            else console.log("[grocery] owner update ok")
+          } else {
+            console.warn("[grocery] no user — skipping save")
+          }
         }
-      } catch { /* non-fatal */ }
+      } catch (err) {
+        console.error("[grocery] save exception:", err)
+      }
     }, 500)
   }, [ownerUserId])
 

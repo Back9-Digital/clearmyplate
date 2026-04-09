@@ -337,9 +337,18 @@ export async function POST(req: NextRequest) {
       parsed = JSON.parse(cleaned)
     }
 
+    // Save latest plan to profile so household members can access it
     await supabase
       .from("profiles")
-      .update({ generations_this_week: currentUsed + 1 })
+      .update({
+        generations_this_week: currentUsed + 1,
+        latest_plan: {
+          plan_id:         savedPlanId,
+          week_start_date: parsed.week_start_date,
+          meals:           parsed.meals,
+          grocery_list:    parsed.grocery_list,
+        },
+      })
       .eq("id", user.id)
 
     // Non-blocking GHL tag + push after successful generation

@@ -19,6 +19,8 @@ export async function GET(req: NextRequest) {
   const ownerUserId = req.nextUrl.searchParams.get("owner")
   if (!ownerUserId) return NextResponse.json({ error: "owner param required" }, { status: 400 })
 
+  console.log("[household/plan] member:", user.id, "requesting plan for owner:", ownerUserId)
+
   const admin = adminClient()
 
   // Validate that current user is actually a member of this household
@@ -29,57 +31,42 @@ export async function GET(req: NextRequest) {
     .eq("member_id", user.id)
     .maybeSingle()
 
+  console.log("[household/plan] membership row:", membership)
+
   if (!membership) {
     return NextResponse.json({ error: "Not a member of this household" }, { status: 403 })
   }
 
-  // Get the owner's household_profiles row
-  const { data: householdProfile } = await admin
-    .from("household_profiles")
-    .select("id")
-    .eq("user_id", ownerUserId)
+  // Read the owner's latest plan directly from their profile row
+  const { data: ownerProfile, error: profileError } = await admin
+    .from("profiles")
+    .select("latest_plan")
+    .eq("id", ownerUserId)
     .maybeSingle()
 
-  if (!householdProfile) {
+  console.log("[household/plan] owner profile latest_plan:", ownerProfile?.latest_plan ? "present" : "null", "error:", profileError?.message)
+
+  if (!ownerProfile?.latest_plan) {
     return NextResponse.json({ plan: null })
   }
 
-  // Fetch the most recent plan
-  const { data: dbPlan } = await admin
-    .from("plans")
-    .select("id, week_start_date, plan_items(*), grocery_lists(items)")
-    .eq("household_id", householdProfile.id)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle()
-
-  if (!dbPlan || !(dbPlan.plan_items as unknown[])?.length) {
-    return NextResponse.json({ plan: null })
-  }
-
-  type Meal = {
-    day_of_week: number
-    day_name: string
-    meal_type: string
-    meal_name: string
-    description: string
-    key_ingredients: string[]
-    is_leftover: boolean
-    prep_time_mins: number
-    portion_notes: string
-  }
   type GroceryItem = { category: string; name: string; quantity: string; checked: boolean }
 
-  const meals = (dbPlan.plan_items as Meal[]).sort((a, b) => a.day_of_week - b.day_of_week)
-  const groceryRaw = (dbPlan.grocery_lists as { items: GroceryItem[] }[])[0]?.items ?? []
-  const grocery = groceryRaw.map((g) => ({ ...g, checked: false }))
+  const stored = ownerProfile.latest_plan as {
+    plan_id: string | null
+    week_start_date: string
+    meals: unknown[]
+    grocery_list: GroceryItem[]
+  }
+
+  const grocery = (stored.grocery_list ?? []).map((g) => ({ ...g, checked: false }))
 
   return NextResponse.json({
     plan: {
-      plan_id: dbPlan.id,
-      week_start_date: dbPlan.week_start_date,
-      meals,
-      grocery_list: grocery,
+      plan_id:         stored.plan_id ?? null,
+      week_start_date: stored.week_start_date,
+      meals:           stored.meals ?? [],
+      grocery_list:    grocery,
     },
   })
 }

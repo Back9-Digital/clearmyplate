@@ -209,7 +209,7 @@ export default function SettingsPage() {
       if (!user) return
       supabase
         .from("profiles")
-        .select("calorie_target, macro_protein, macro_carbs, macro_fat, plan_type, generations_this_week, week_reset_at, family_members, allergies, goal, weekly_budget, will_eat, wont_eat, use_leftovers, vegetarian_night, keep_simple, meals_planned")
+        .select("calorie_target, macro_protein, macro_carbs, macro_fat, plan_type, generations_this_week, week_reset_at, family_members, allergies, goal, weekly_budget, will_eat, wont_eat, use_leftovers, vegetarian_night, keep_simple, meals_planned, household_adults, household_kids, full_name")
         .eq("id", user.id)
         .single()
         .then(({ data, error }) => {
@@ -229,13 +229,40 @@ export default function SettingsPage() {
           if (data.generations_this_week != null) setGenerationsUsed(data.generations_this_week)
           if (data.week_reset_at)         setWeekResetAt(data.week_reset_at)
 
-          // Family members — derive adults/kids from stored data
-          if (Array.isArray(data.family_members) && data.family_members.length) {
-            const members = data.family_members as FamilyMember[]
-            setFamilyMembers(members)
-            setAdults(members.filter((m) => m.role === "adult").length || 2)
-            setKids(members.filter((m) => m.role === "child").length)
-          }
+          // Household counts — read directly from household_adults/kids (authoritative)
+          // Fall back to counting family_members only if the columns are absent
+          const savedAdults = data.household_adults != null
+            ? data.household_adults
+            : (Array.isArray(data.family_members)
+                ? (data.family_members as FamilyMember[]).filter((m) => m.role === "adult").length
+                : 2) || 2
+          const savedKids = data.household_kids != null
+            ? data.household_kids
+            : (Array.isArray(data.family_members)
+                ? (data.family_members as FamilyMember[]).filter((m) => m.role === "child").length
+                : 0)
+          setAdults(savedAdults)
+          setKids(savedKids)
+
+          // Build a full family member list matching the household counts.
+          // Named members are preserved; unnamed slots are blank.
+          // Adult 1 defaults to the account owner's full_name.
+          const ownerName = ((data.full_name as string | null) ?? "").trim()
+          const namedAdults = (Array.isArray(data.family_members)
+            ? (data.family_members as FamilyMember[]).filter((m) => m.role === "adult")
+            : [])
+          const namedKids = (Array.isArray(data.family_members)
+            ? (data.family_members as FamilyMember[]).filter((m) => m.role === "child")
+            : [])
+          const fullAdults: FamilyMember[] = Array.from({ length: savedAdults }, (_, i) => ({
+            role: "adult",
+            name: namedAdults[i]?.name || (i === 0 ? ownerName : ""),
+          }))
+          const fullKids: FamilyMember[] = Array.from({ length: savedKids }, (_, i) => ({
+            role: "child",
+            name: namedKids[i]?.name || "",
+          }))
+          setFamilyMembers([...fullAdults, ...fullKids])
 
           // Allergies
           if (Array.isArray(data.allergies)) {
@@ -368,6 +395,7 @@ export default function SettingsPage() {
         ...otherAllergies.split(",").map((s) => s.trim()).filter(Boolean),
       ]
 
+      console.log("[settings] saving adults:", adults, "kids:", kids)
       await supabase
         .from("profiles")
         .update({

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, Suspense } from "react"
+import { useEffect, useState, useRef, useCallback, Suspense } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { RefreshCw, Heart, ArrowLeft, Shuffle, X, BookOpen, Clock, Users, ChevronRight, Eye } from "lucide-react"
@@ -590,18 +590,36 @@ function PlanPageInner() {
   const [swapFor, setSwapFor]                   = useState<Meal | null>(null)
   const [regenSavePrompt, setRegenSavePrompt]   = useState<string | null>(null) // instruction to offer saving
   const [regenSaveState, setRegenSaveState]     = useState<"idle" | "saving" | "saved">("idle")
+  // Grocery sync
+  const [ownerProfileId, setOwnerProfileId]     = useState<string | null>(null)
+  const saveTimerRef                            = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Load plan on mount
   useEffect(() => {
     async function load() {
       setFetch(true)
       try {
+        // Helper: apply saved checked_items to a plan's grocery list
+        const applyChecked = (rawPlan: Plan, checkedNames: string[]): Plan => ({
+          ...rawPlan,
+          grocery_list: rawPlan.grocery_list.map((i) => ({ ...i, checked: checkedNames.includes(i.name) })),
+        })
+
         // Member viewing household plan — fetch via API route (admin client)
         if (ownerUserId) {
-          const res = await fetch(`/api/household/plan?owner=${ownerUserId}`)
-          if (res.ok) {
-            const { plan: fetchedPlan } = await res.json()
-            setPlan(fetchedPlan ?? null)
+          setOwnerProfileId(ownerUserId)
+          const [planRes, checkedRes] = await Promise.all([
+            fetch(`/api/household/plan?owner=${ownerUserId}`),
+            fetch(`/api/household/checked?owner=${ownerUserId}`),
+          ])
+          if (planRes.ok) {
+            const { plan: fetchedPlan } = await planRes.json()
+            if (fetchedPlan) {
+              const checkedNames: string[] = checkedRes.ok ? (await checkedRes.json()).checked_items ?? [] : []
+              setPlan(applyChecked(fetchedPlan, checkedNames))
+            } else {
+              setPlan(null)
+            }
           }
           return
         }
@@ -611,17 +629,21 @@ function PlanPageInner() {
         const { data: { user } } = await supabase.auth.getUser()
 
         if (user) {
-          const { data: profile } = await supabase
-            .from("household_profiles")
-            .select("id")
-            .eq("user_id", user.id)
-            .single()
+          setOwnerProfileId(user.id)
 
-          if (profile) {
+          // Load checked_items alongside plan
+          const [profilesRes, householdRes] = await Promise.all([
+            supabase.from("profiles").select("checked_items").eq("id", user.id).single(),
+            supabase.from("household_profiles").select("id").eq("user_id", user.id).single(),
+          ])
+          const checkedNames: string[] = profilesRes.data?.checked_items ?? []
+
+          const householdProfile = householdRes.data
+          if (householdProfile) {
             const { data: dbPlan } = await supabase
               .from("plans")
               .select(`id, week_start_date, plan_items(*), grocery_lists(items)`)
-              .eq("household_id", profile.id)
+              .eq("household_id", householdProfile.id)
               .order("created_at", { ascending: false })
               .limit(1)
               .single()
@@ -629,8 +651,8 @@ function PlanPageInner() {
             if (dbPlan && dbPlan.plan_items?.length) {
               const meals = (dbPlan.plan_items as Meal[]).sort((a, b) => a.day_of_week - b.day_of_week)
               const groceryRaw = (dbPlan.grocery_lists as { items: GroceryItem[] }[])[0]?.items ?? []
-              const grocery = groceryRaw.map((g) => ({ ...g, checked: false }))
-              setPlan({ plan_id: dbPlan.id, week_start_date: dbPlan.week_start_date, meals, grocery_list: grocery })
+              const rawPlan: Plan = { plan_id: dbPlan.id, week_start_date: dbPlan.week_start_date, meals, grocery_list: groceryRaw.map((g) => ({ ...g, checked: false })) }
+              setPlan(applyChecked(rawPlan, checkedNames))
               return
             }
           }
@@ -640,10 +662,17 @@ function PlanPageInner() {
         const cached = localStorage.getItem("cmp_latest_plan")
         if (cached) {
           const parsed = JSON.parse(cached) as Omit<Plan, "grocery_list"> & { grocery_list: GroceryItem[] }
-          setPlan({
-            ...parsed,
-            grocery_list: parsed.grocery_list.map((g) => ({ ...g, checked: false })),
-          })
+          const rawPlan: Plan = { ...parsed, grocery_list: parsed.grocery_list.map((g) => ({ ...g, checked: false })) }
+          // checked_items already loaded above for owner — re-use if available
+          const supabase2 = createClient()
+          const { data: { user: u2 } } = await supabase2.auth.getUser()
+          const checkedNames: string[] = []
+          if (u2) {
+            const { data: p } = await supabase2.from("profiles").select("checked_items").eq("id", u2.id).single()
+            checkedNames.push(...(p?.checked_items ?? []))
+            setOwnerProfileId(u2.id)
+          }
+          setPlan(applyChecked(rawPlan, checkedNames))
           return
         }
       } catch {
@@ -671,9 +700,13 @@ function PlanPageInner() {
   }, [])
 
   const toggleChecked = (name: string) => {
-    setPlan((p) =>
-      p ? { ...p, grocery_list: p.grocery_list.map((i) => i.name === name ? { ...i, checked: !i.checked } : i) } : p
-    )
+    setPlan((prev) => {
+      if (!prev) return prev
+      const updated = prev.grocery_list.map((i) => i.name === name ? { ...i, checked: !i.checked } : i)
+      const checkedNames = updated.filter((i) => i.checked).map((i) => i.name)
+      debouncedSaveChecked(checkedNames)
+      return { ...prev, grocery_list: updated }
+    })
   }
 
   const handleHeartClick = (meal: Meal) => {
@@ -718,6 +751,51 @@ function PlanPageInner() {
       setSavingFreq(false)
     }
   }
+
+  // ── Grocery checked_items persistence ───────────────────────
+
+  const debouncedSaveChecked = useCallback((checkedNames: string[]) => {
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+    saveTimerRef.current = setTimeout(async () => {
+      try {
+        if (ownerUserId) {
+          // Member: write to owner's profile via API route (bypasses RLS)
+          await fetch("/api/household/checked", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ owner_id: ownerUserId, checked_items: checkedNames }),
+          })
+        } else {
+          // Owner: write directly to own profile
+          const supabase = createClient()
+          const { data: { user } } = await supabase.auth.getUser()
+          if (user) await supabase.from("profiles").update({ checked_items: checkedNames }).eq("id", user.id)
+        }
+      } catch { /* non-fatal */ }
+    }, 500)
+  }, [ownerUserId])
+
+  // Realtime subscription — updates grocery checkboxes when partner ticks items
+  useEffect(() => {
+    if (!ownerProfileId) return
+    const supabase = createClient()
+    const channel = supabase
+      .channel(`checked-items-${ownerProfileId}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "profiles", filter: `id=eq.${ownerProfileId}` },
+        (payload) => {
+          const newChecked: string[] = (payload.new as { checked_items?: string[] }).checked_items ?? []
+          setPlan((prev) =>
+            prev
+              ? { ...prev, grocery_list: prev.grocery_list.map((i) => ({ ...i, checked: newChecked.includes(i.name) })) }
+              : prev
+          )
+        }
+      )
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [ownerProfileId])
 
   // Append text to profiles.wont_eat (reads current value first to avoid overwriting)
   const appendWontEat = async (text: string) => {
@@ -1101,7 +1179,10 @@ function PlanPageInner() {
                   <button
                     className="text-xs font-medium"
                     style={{ color: SAGE }}
-                    onClick={() => setPlan((p) => p ? { ...p, grocery_list: p.grocery_list.map((i) => ({ ...i, checked: false })) } : p)}
+                    onClick={() => {
+                      setPlan((p) => p ? { ...p, grocery_list: p.grocery_list.map((i) => ({ ...i, checked: false })) } : p)
+                      debouncedSaveChecked([])
+                    }}
                   >
                     Clear all
                   </button>

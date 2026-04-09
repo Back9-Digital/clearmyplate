@@ -438,6 +438,7 @@ export async function POST(req: NextRequest) {
           meals:           parsed.meals,
           grocery_list:    parsed.grocery_list,
         },
+        checked_items: [], // reset ticked grocery items on new plan
       })
       .eq("id", user.id)
     if (profileUpdateError) {

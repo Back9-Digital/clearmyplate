@@ -468,6 +468,7 @@ function PlanPageInner() {
   const [regenOpen, setRegenOpen]   = useState(false)
   const [regenLoading, setRegenLoading] = useState(false)
   const [error, setError]           = useState<string | null>(null)
+  const [limitReached, setLimitReached] = useState<{ planType: string } | null>(null)
   const [recipeFor, setRecipeFor]   = useState<Meal | null>(null)
   const [pendingFavMeal, setPendingFavMeal] = useState<Meal | null>(null)
   const [savingFreq, setSavingFreq] = useState(false)
@@ -603,13 +604,19 @@ function PlanPageInner() {
   const handleRegen = async (instructions: string) => {
     setRegenLoading(true)
     setError(null)
+    setLimitReached(null)
     try {
       const cached = localStorage.getItem("cmp_latest_plan")
       const prevPrefs = cached ? JSON.parse(cached) : {}
       const body = { ...prevPrefs, instructions }
       const res = await fetch("/api/plans/generate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
-      if (!res.ok) throw new Error()
       const result = await res.json()
+      if (res.status === 403 && result.limitReached) {
+        setLimitReached({ planType: result.planType ?? "free" })
+        setRegenOpen(false)
+        return
+      }
+      if (!res.ok) throw new Error(result?.error ?? "Generation failed")
       localStorage.setItem("cmp_latest_plan", JSON.stringify(result))
       setPlan({ ...result, grocery_list: result.grocery_list.map((g: GroceryItem) => ({ ...g, checked: false })) })
       setRegenOpen(false)
@@ -710,6 +717,32 @@ function PlanPageInner() {
             </button>
           ))}
         </div>
+
+        {limitReached && (() => {
+          const isLifetime = limitReached.planType === "launch_special" || limitReached.planType === "lifetime"
+          return (
+            <div
+              className="mb-4 flex flex-col gap-3 rounded-xl px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+              style={{ backgroundColor: "#FEF3C7", border: "1px solid #FCD34D" }}
+            >
+              <p className="text-sm font-medium" style={{ color: "#92400E" }}>
+                {isLifetime
+                  ? "Weekly limit reached. Your generations reset every Monday."
+                  : "You've used all your generations this week. Your limit resets on Monday — or upgrade for more."}
+              </p>
+              {!isLifetime && (
+                <a href="/#pricing" className="shrink-0">
+                  <button
+                    className="rounded-full px-4 py-1.5 text-xs font-semibold text-white"
+                    style={{ backgroundColor: "#D97706" }}
+                  >
+                    Upgrade →
+                  </button>
+                </a>
+              )}
+            </div>
+          )
+        })()}
 
         {error && (
           <p className="mb-4 rounded-xl px-4 py-3 text-sm" style={{ backgroundColor: "#FEE2E2", color: "#B91C1C" }}>{error}</p>

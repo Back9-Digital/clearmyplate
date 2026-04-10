@@ -172,6 +172,38 @@ ${planLunch
 - Always show the TOTAL quantity in the grocery_list (e.g. "1.8 kg chicken thighs"), not per-person amounts.
 - Set portion_notes on each meal to show the per-person breakdown so cooks know how much to plate.
 
+BUDGET VS PROTEIN RULES — HARD CONSTRAINTS:
+${(() => {
+  const totalPeople = adults + kids
+  // Effective budget threshold — larger households need more protein, so raise thresholds
+  const sizeAdj = totalPeople >= 6 ? 100 : totalPeople >= 4 ? 50 : 0
+  const effectiveBudget = (budget as number || 200) + sizeAdj
+  const perMealBudget = Math.round((budget as number || 200) / 7)
+  const maxProteinPerMeal = Math.round(perMealBudget * 0.40)
+
+  let tierRules: string
+  if (effectiveBudget < 150) {
+    tierRules = "Budget under $150 (adjusted for household size): use budget proteins 5-6 nights, mid-tier 1-2 nights, NO premium proteins at all."
+  } else if (effectiveBudget < 200) {
+    tierRules = "Budget $150-200 (adjusted for household size): budget proteins 3-4 nights, mid-tier 2-3 nights, ONE premium protein night maximum."
+  } else if (effectiveBudget < 300) {
+    tierRules = "Budget $200-300 (adjusted for household size): budget 2-3 nights, mid-tier 2-3 nights, premium 1-2 nights maximum."
+  } else {
+    tierRules = "Budget $300+ (adjusted for household size): free range across all tiers, but still prioritise value and variety."
+  }
+
+  return `- Weekly budget: NZD $${budget || 200}. Total people: ${totalPeople}. Per-meal budget: ~$${perMealBudget}. Max protein spend per meal: ~$${maxProteinPerMeal}.
+- ${tierRules}
+- NZ supermarket protein cost tiers (approximate per kg):
+  • Budget ($10-18/kg): chicken thighs, chicken drumsticks, beef mince, pork mince, canned tuna, eggs, lentils, chickpeas
+  • Mid ($18-28/kg): chicken breast, pork chops, pork belly, lamb mince, sausages, bacon
+  • Premium ($28-45/kg): beef steak (all cuts), lamb chops, lamb roast, beef roast, salmon fillet, prawns
+  • Very premium ($45+/kg): eye fillet, rack of lamb, whole salmon — NEVER on budgets under $300
+- Before finalising each meal, calculate: (protein kg needed × cost per kg). If protein cost alone exceeds 35% of the weekly budget, choose a different protein.
+- Practical check: ${totalPeople} people × 200g = ${(totalPeople * 200 / 1000).toFixed(1)}kg protein per meal. At $32/kg for steak that is $${Math.round(totalPeople * 200 / 1000 * 32)} per meal on protein alone. On a $${budget || 200} weekly budget, that is ${Math.round((totalPeople * 200 / 1000 * 32) / (budget as number || 200) * 100)}% of the weekly budget on one meal's protein — if over 25%, choose a more affordable protein.
+- When budget is tight: prioritise flavourful budget proteins done well (slow-cooked chicken thighs, beef mince ragu, pork belly braise, sausage tray bake) over cheap versions of premium cuts done poorly.`
+})()}
+
 GROCERY LIST RULES:
 - Do NOT include pantry staples that most families already own and buy in bulk:
   • Oils: olive oil, vegetable oil, sesame oil, coconut oil, cooking spray

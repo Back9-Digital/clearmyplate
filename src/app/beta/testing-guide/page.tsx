@@ -200,7 +200,7 @@ export default function BetaTestingGuidePage() {
           <ul className="space-y-2">
             {[
               "Use the Help button (? bubble) inside the app — Contact Us",
-              <>Or email directly: <a href="mailto:hello@clearmyplate.app" style={{ color: SAGE }} className="underline underline-offset-2">hello@clearmyplate.app</a></>,
+              <>Or email directly: <a href="mailto:clearmyplate@back9.co.nz" style={{ color: SAGE }} className="underline underline-offset-2">clearmyplate@back9.co.nz</a></>,
               "You'll also get a short survey from us after your first week",
               "There are no wrong answers — brutal honesty is the most helpful",
             ].map((item, i) => (

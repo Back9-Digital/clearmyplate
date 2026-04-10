@@ -1,4 +1,4 @@
-const CACHE_NAME = "clearmyplate-v2"
+const CACHE_NAME = "clearmyplate-v3"
 
 const PRECACHE_URLS = [
   "/images/Clear My Plate Logo Horizontal Lockup.svg",

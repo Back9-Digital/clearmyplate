@@ -154,6 +154,24 @@ ADULT LUNCH RULES (Mon–Fri only):
 ` : "- No lunches planned."}
 
 ${buildMealPrefsSection(mealPrefs)}${macroSection}
+PORTION SIZE RULES — THIS IS CRITICAL. READ CAREFULLY:
+${planLunch
+  ? `- Every dinner must produce enough food for BOTH the dinner itself AND a full leftover lunch the next day for all adults.
+- Total servings to cook per dinner = dinner (${adults} adults + ${kids} kids) + next-day adult lunch (${adults} adults) = ${adults * 2 + kids} servings.
+- Key ingredient quantities in the grocery_list MUST reflect this total. Do not halve portions.`
+  : `- Every dinner must feed the full household: ${adults} adults + ${kids} kids = ${adults + kids} servings.`}
+- Base portions per person per meal:
+  • Meat/fish (as the main protein, e.g. steak, chicken breast, pork chop): Adults 220g raw, Kids 130g raw
+  • Meat/fish (mixed into dish, e.g. curry, stew, pasta sauce, stir-fry): Adults 180g raw, Kids 110g raw
+  • Minced meat: Adults 200g raw, Kids 120g raw
+  • Pasta/noodles (dry): Adults 100g, Kids 75g
+  • Rice (dry): Adults 90g, Kids 60g
+  • Potatoes/kumara (raw): Adults 250g, Kids 160g
+- Apply these per-person numbers and multiply by total servings above.
+- Example for ${adults} adults + ${kids} kids${planLunch ? " with lunches" : ""}: a chicken thigh dinner requires ${planLunch ? `${Math.round(220 * (adults * 2 + kids))}g` : `${Math.round(220 * (adults + kids))}g`} chicken thighs total.
+- Always show the TOTAL quantity in the grocery_list (e.g. "1.8 kg chicken thighs"), not per-person amounts.
+- Set portion_notes on each meal to show the per-person breakdown so cooks know how much to plate.
+
 GROCERY LIST RULES:
 - Do NOT include pantry staples that most families already own and buy in bulk:
   • Oils: olive oil, vegetable oil, sesame oil, coconut oil, cooking spray

@@ -7,7 +7,7 @@ import {
   generationsAllowed,
   generationsRemaining,
   weekNeedsReset,
-  getLastMondayMidnightUTC,
+  getLastGroceryDayMidnightUTC,
   isPaidPlan,
   trialDaysRemaining,
 } from "@/lib/generations"
@@ -254,7 +254,7 @@ export async function POST(req: NextRequest) {
 
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
-      .select("plan_type, generations_this_week, week_reset_at, calorie_target, macro_protein, macro_carbs, macro_fat, family_members, allergies, goal, household_adults, household_kids, weekly_budget, will_eat, wont_eat, use_leftovers, vegetarian_night, keep_simple, meals_planned")
+      .select("plan_type, generations_this_week, week_reset_at, grocery_day, calorie_target, macro_protein, macro_carbs, macro_fat, family_members, allergies, goal, household_adults, household_kids, weekly_budget, will_eat, wont_eat, use_leftovers, vegetarian_night, keep_simple, meals_planned")
       .eq("id", user.id)
       .single()
 
@@ -282,13 +282,14 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Weekly reset — paid plans only ─────────────────────────
+    const groceryDay = profile.grocery_day ?? 1
     let currentUsed = profile.generations_this_week ?? 0
-    if (isPaidPlan(planType) && weekNeedsReset(profile.week_reset_at ?? new Date().toISOString())) {
+    if (isPaidPlan(planType) && weekNeedsReset(profile.week_reset_at ?? new Date().toISOString(), groceryDay)) {
       await supabase
         .from("profiles")
         .update({
           generations_this_week: 0,
-          week_reset_at: getLastMondayMidnightUTC().toISOString(),
+          week_reset_at: getLastGroceryDayMidnightUTC(groceryDay).toISOString(),
         })
         .eq("id", user.id)
       currentUsed = 0

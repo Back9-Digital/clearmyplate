@@ -5,6 +5,7 @@ import Link from "next/link"
 import { ArrowLeft, Plus, Minus, Check, Save, ExternalLink, Mail, UserPlus, X as XIcon } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { HelpBubble } from "@/components/HelpBubble"
+import { DayPicker } from "@/components/DayPicker"
 import {
   generationsAllowed,
   generationsRemaining,
@@ -152,6 +153,7 @@ export default function SettingsPage() {
   const [kids, setKids]                   = useState(1)
   const [mealsTogether, setMealsTogether] = useState(true)
   const [timezone, setTimezone]           = useState("Pacific/Auckland")
+  const [groceryDay, setGroceryDay]       = useState(1)
 
   // Family members
   const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([
@@ -214,7 +216,7 @@ export default function SettingsPage() {
       if (!user) return
       supabase
         .from("profiles")
-        .select("calorie_target, macro_protein, macro_carbs, macro_fat, plan_type, generations_this_week, week_reset_at, family_members, allergies, goal, weekly_budget, will_eat, wont_eat, use_leftovers, vegetarian_night, keep_simple, meals_planned, household_adults, household_kids, full_name")
+        .select("calorie_target, macro_protein, macro_carbs, macro_fat, plan_type, generations_this_week, week_reset_at, family_members, allergies, goal, weekly_budget, will_eat, wont_eat, use_leftovers, vegetarian_night, keep_simple, meals_planned, household_adults, household_kids, full_name, grocery_day")
         .eq("id", user.id)
         .single()
         .then(({ data, error }) => {
@@ -287,6 +289,7 @@ export default function SettingsPage() {
           if (data.use_leftovers != null)    setUseLeftovers(data.use_leftovers)
           if (data.vegetarian_night != null) setVegetarianNight(data.vegetarian_night)
           if (data.keep_simple != null)      setKeepSimple(data.keep_simple)
+          if (data.grocery_day != null)      setGroceryDay(data.grocery_day)
 
           setLoading(false)
         })
@@ -443,6 +446,7 @@ export default function SettingsPage() {
           use_leftovers:    useLeftovers,
           vegetarian_night: vegetarianNight,
           keep_simple:      keepSimple,
+          grocery_day:      groceryDay,
         })
         .eq("id", user.id)
 
@@ -536,6 +540,11 @@ export default function SettingsPage() {
                   <option value="Europe/London">London (GMT)</option>
                 </select>
               </Row>
+              <div className="rounded-2xl bg-white px-4 py-4 sm:px-5" style={{ border: `1px solid ${BORDER}` }}>
+                <p className="mb-0.5 text-sm font-medium" style={{ color: DARK }}>Grocery shopping day</p>
+                <p className="mb-3 text-xs" style={{ color: GRAY }}>Your weekly plan resets the night before.</p>
+                <DayPicker value={groceryDay} onChange={setGroceryDay} />
+              </div>
             </div>
           </section>
 

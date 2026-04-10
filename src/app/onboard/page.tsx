@@ -7,6 +7,7 @@ import Image from "next/image"
 import { Check, ChevronLeft, Plus, Minus, Users, Zap, Leaf } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { GeneratingOverlay } from "@/components/GeneratingOverlay"
+import { DayPicker } from "@/components/DayPicker"
 
 const SAGE     = "#4A7C6F"
 const BG       = "#F5F3EE"
@@ -16,7 +17,8 @@ const DARK     = "#1C2B27"
 const GRAY     = "#6B7B77"
 const ACCENT   = "#D4E8E2"
 
-const TOTAL_STEPS = 8
+const TOTAL_STEPS = 9
+const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
 
 type FormData = {
   goal: "maintain" | "build_muscle" | "lose_weight"
@@ -35,6 +37,7 @@ type FormData = {
   use_leftovers: boolean
   vegetarian_night: boolean
   keep_simple: boolean
+  grocery_day: number
 }
 
 const initialData: FormData = {
@@ -54,6 +57,7 @@ const initialData: FormData = {
   use_leftovers: true,
   vegetarian_night: false,
   keep_simple: true,
+  grocery_day: 1,
 }
 
 const allergyOptions = ["Gluten", "Dairy", "Eggs", "Nuts", "Shellfish", "Soy", "Sesame"]
@@ -295,6 +299,7 @@ export default function Onboard() {
             vegetarian_night: data.vegetarian_night,
             keep_simple:      data.keep_simple,
             allergies:        allAllergies.length ? allAllergies : null,
+            grocery_day:      data.grocery_day,
           })
           .eq("id", u.id)
           .then(({ error }) => {
@@ -423,8 +428,17 @@ export default function Onboard() {
             )
           })()}
 
-          {/* ── Step 3: Planning preferences ── */}
+          {/* ── Step 3: Grocery day ── */}
           {step === 2 && (
+            <div>
+              <h2 className="mb-1 text-2xl font-bold" style={{ color: DARK }}>When do you usually do your grocery shopping?</h2>
+              <p className="mb-8 text-sm" style={{ color: GRAY }}>We&rsquo;ll reset your weekly plan the night before so it&rsquo;s ready when you need it.</p>
+              <DayPicker value={data.grocery_day} onChange={(v) => set("grocery_day", v)} />
+            </div>
+          )}
+
+          {/* ── Step 4: Planning preferences ── */}
+          {step === 3 && (
             <div>
               <h2 className="mb-1 text-2xl font-bold" style={{ color: DARK }}>Planning preferences</h2>
               <p className="mb-8 text-sm" style={{ color: GRAY }}>Which meals do you want planned, and what units do you prefer?</p>
@@ -470,8 +484,8 @@ export default function Onboard() {
             </div>
           )}
 
-          {/* ── Step 4: Who's this plan for? ── */}
-          {step === 3 && (
+          {/* ── Step 5: Who's this plan for? ── */}
+          {step === 4 && (
             <div>
               <h2 className="mb-1 text-2xl font-bold" style={{ color: DARK }}>Who&rsquo;s this plan for?</h2>
               <p className="mb-8 text-sm" style={{ color: GRAY }}>
@@ -520,8 +534,8 @@ export default function Onboard() {
             </div>
           )}
 
-          {/* ── Step 5: Food preferences ── */}
-          {step === 4 && (
+          {/* ── Step 6: Food preferences ── */}
+          {step === 5 && (
             <div>
               <h2 className="mb-1 text-2xl font-bold" style={{ color: DARK }}>Food preferences</h2>
               <p className="mb-8 text-sm" style={{ color: GRAY }}>Select everything you&rsquo;re happy to eat.</p>
@@ -601,8 +615,8 @@ export default function Onboard() {
             </div>
           )}
 
-          {/* ── Step 6: Budget ── */}
-          {step === 5 && (
+          {/* ── Step 7: Budget ── */}
+          {step === 6 && (
             <div>
               <h2 className="mb-1 text-2xl font-bold" style={{ color: DARK }}>Weekly budget</h2>
               <p className="mb-8 text-sm" style={{ color: GRAY }}>We&rsquo;ll keep meals within your weekly grocery budget (NZD).</p>
@@ -639,8 +653,8 @@ export default function Onboard() {
             </div>
           )}
 
-          {/* ── Step 7: Week preferences ── */}
-          {step === 6 && (
+          {/* ── Step 8: Week preferences ── */}
+          {step === 7 && (
             <div>
               <h2 className="mb-1 text-2xl font-bold" style={{ color: DARK }}>Week preferences</h2>
               <p className="mb-8 text-sm" style={{ color: GRAY }}>Fine-tune how we plan your week.</p>
@@ -668,8 +682,8 @@ export default function Onboard() {
             </div>
           )}
 
-          {/* ── Step 8: Summary ── */}
-          {step === 7 && (
+          {/* ── Step 9: Summary ── */}
+          {step === 8 && (
             <div>
               <h2 className="mb-1 text-2xl font-bold" style={{ color: DARK }}>Ready to go!</h2>
               <p className="mb-8 text-sm" style={{ color: GRAY }}>Here&rsquo;s what we know about your household.</p>
@@ -677,6 +691,7 @@ export default function Onboard() {
                 <div className="space-y-4">
                   {[
                     { label: "Household",     value: `${data.adults} adult${data.adults !== 1 ? "s" : ""}${data.kids > 0 ? `, ${data.kids} kid${data.kids !== 1 ? "s" : ""}` : ""}` },
+                    { label: "Grocery day",   value: DAY_NAMES[data.grocery_day] },
                     { label: "Goal",          value: goalLabel },
                     { label: "Plan type",     value: data.household_type.map((t) => householdCards.find((c) => c.value === t)?.label ?? t).join(", ") || "Mixed household" },
                     { label: "Meals planned", value: data.meals.map((m) => m[0].toUpperCase() + m.slice(1)).join(" & ") || "None" },
@@ -719,8 +734,8 @@ export default function Onboard() {
           ) : <div />}
 
           <div className="flex flex-col items-end gap-2">
-            {/* Skip link on step 4 */}
-            {step === 3 && !loading && (
+            {/* Skip link on step 5 (Who's this plan for?) */}
+            {step === 4 && !loading && (
               <button
                 onClick={() => setStep((s) => s + 1)}
                 className="text-xs"

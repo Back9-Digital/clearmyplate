@@ -20,10 +20,11 @@ export function isPaidPlan(planType: string): boolean {
 }
 
 /**
- * Returns the UTC timestamp of the most recent Monday at midnight Pacific/Auckland.
+ * Returns the UTC timestamp of the most recent midnight NZT for the given day of week.
+ * groceryDay: 0=Sunday, 1=Monday, ... 6=Saturday. Defaults to Monday.
  * Handles NZ DST automatically.
  */
-export function getLastMondayMidnightUTC(): Date {
+export function getLastGroceryDayMidnightUTC(groceryDay: number = 1): Date {
   const tz  = "Pacific/Auckland"
   const now = new Date()
 
@@ -35,21 +36,26 @@ export function getLastMondayMidnightUTC(): Date {
   // Shift now into NZT space (treated as UTC arithmetic)
   const nowNZT = new Date(now.getTime() + offsetMs)
 
-  // Find Monday of the current NZT week
+  // How many days ago was the last occurrence of groceryDay? (0 = today)
   const day = nowNZT.getUTCDay() // 0=Sun, 1=Mon … 6=Sat
-  const daysToMonday = day === 0 ? 6 : day - 1
+  const daysAgo = (day - groceryDay + 7) % 7
 
-  const mondayNZT = new Date(nowNZT)
-  mondayNZT.setUTCDate(nowNZT.getUTCDate() - daysToMonday)
-  mondayNZT.setUTCHours(0, 0, 0, 0)
+  const targetNZT = new Date(nowNZT)
+  targetNZT.setUTCDate(nowNZT.getUTCDate() - daysAgo)
+  targetNZT.setUTCHours(0, 0, 0, 0)
 
   // Shift back to UTC
-  return new Date(mondayNZT.getTime() - offsetMs)
+  return new Date(targetNZT.getTime() - offsetMs)
 }
 
-/** True if week_reset_at predates the most recent Monday midnight NZT */
-export function weekNeedsReset(weekResetAt: string): boolean {
-  return new Date(weekResetAt) < getLastMondayMidnightUTC()
+/** Backward-compatible alias (Monday = 1) */
+export function getLastMondayMidnightUTC(): Date {
+  return getLastGroceryDayMidnightUTC(1)
+}
+
+/** True if week_reset_at predates the most recent midnight NZT for the user's grocery day */
+export function weekNeedsReset(weekResetAt: string, groceryDay: number = 1): boolean {
+  return new Date(weekResetAt) < getLastGroceryDayMidnightUTC(groceryDay)
 }
 
 /** Days remaining in a 14-day free trial, based on account created_at. Negative = expired. */

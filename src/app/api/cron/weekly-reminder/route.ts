@@ -12,6 +12,13 @@ function adminClient() {
   )
 }
 
+/** Returns 0–6 (Sun–Sat) for the current time in Pacific/Auckland */
+function getNZTDayOfWeek(): number {
+  return new Date(
+    new Date().toLocaleString("en-US", { timeZone: "Pacific/Auckland" })
+  ).getDay()
+}
+
 export async function GET(req: NextRequest) {
   const secret = req.headers.get("x-cron-secret")
   if (!secret || secret !== process.env.CRON_SECRET) {
@@ -20,13 +27,17 @@ export async function GET(req: NextRequest) {
 
   const supabase = adminClient()
 
-  // Paid users who haven't generated a plan in 5+ days
+  // Today in NZT — only remind users whose grocery day is today
+  const todayDow = getNZTDayOfWeek()
+
+  // Paid users whose grocery_day is today and haven't generated in 5+ days
   const cutoff = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString()
 
   const { data: profiles, error } = await supabase
     .from("profiles")
     .select("email")
     .neq("plan_type", "free")
+    .eq("grocery_day", todayDow)
     .or(`week_reset_at.is.null,week_reset_at.lt.${cutoff}`)
 
   if (error) {

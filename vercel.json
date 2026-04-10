@@ -1,8 +1,12 @@
 {
   "crons": [
     {
+      "path": "/api/cron/weekly-reset",
+      "schedule": "0 12 * * *"
+    },
+    {
       "path": "/api/cron/weekly-reminder",
-      "schedule": "0 19 * * 0"
+      "schedule": "0 12 * * *"
     },
     {
       "path": "/api/cron/trial-expiring",

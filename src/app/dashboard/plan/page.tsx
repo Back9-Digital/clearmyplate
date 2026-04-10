@@ -919,6 +919,8 @@ function PlanPageInner() {
   const [customItems, setCustomItems]           = useState<CustomItem[]>([])
   const [newItemText, setNewItemText]           = useState("")
   const customSaveTimerRef                      = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Pantry staples toggle
+  const [showPantry, setShowPantry]             = useState(false)
 
   // Load plan on mount
   useEffect(() => {
@@ -1221,15 +1223,22 @@ function PlanPageInner() {
     }
   }
 
-  // Group grocery list by category
-  const groceryByCategory = (plan?.grocery_list ?? []).reduce<Record<string, GroceryItem[]>>((acc, item) => {
+  // Categories treated as pantry staples (hidden when toggle is off)
+  const PANTRY_CATEGORIES = new Set(["Pantry Staples", "Pantry", "Condiments", "Spices"])
+
+  // Group grocery list by category, filtering pantry when toggle is off
+  const visibleGroceryItems = (plan?.grocery_list ?? []).filter(
+    (item) => showPantry || !PANTRY_CATEGORIES.has(item.category)
+  )
+  const groceryByCategory = visibleGroceryItems.reduce<Record<string, GroceryItem[]>>((acc, item) => {
     if (!acc[item.category]) acc[item.category] = []
     acc[item.category].push(item)
     return acc
   }, {})
 
-  const totalItems   = (plan?.grocery_list.length ?? 0) + customItems.length
-  const checkedItems = (plan?.grocery_list.filter((i) => i.checked).length ?? 0) + customItems.filter((i) => i.checked).length
+  const totalItems   = visibleGroceryItems.length + customItems.length
+  const checkedItems = visibleGroceryItems.filter((i) => i.checked).length + customItems.filter((i) => i.checked).length
+  const pantryCount  = (plan?.grocery_list ?? []).filter((i) => PANTRY_CATEGORIES.has(i.category)).length
 
   const weekLabel = plan?.week_start_date
     ? new Date(plan.week_start_date).toLocaleDateString("en-NZ", { day: "numeric", month: "short", year: "numeric" })
@@ -1609,19 +1618,34 @@ function PlanPageInner() {
                       {checkedItems} of {totalItems} items checked
                     </p>
                   </div>
-                  <button
-                    className="text-xs font-medium"
-                    style={{ color: SAGE }}
-                    onClick={() => {
-                      setPlan((p) => p ? { ...p, grocery_list: p.grocery_list.map((i) => ({ ...i, checked: false })) } : p)
-                      debouncedSaveChecked([])
-                      const uncheckedCustom = customItems.map((i) => ({ ...i, checked: false }))
-                      setCustomItems(uncheckedCustom)
-                      debouncedSaveCustom(uncheckedCustom)
-                    }}
-                  >
-                    Clear all
-                  </button>
+                  <div className="flex items-center gap-3">
+                    {pantryCount > 0 && (
+                      <button
+                        onClick={() => setShowPantry((v) => !v)}
+                        className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-all"
+                        style={showPantry
+                          ? { backgroundColor: SAGE, color: "white" }
+                          : { backgroundColor: MUTED_BG, color: GRAY }
+                        }
+                      >
+                        🧴 Pantry
+                        {!showPantry && <span style={{ color: GRAY }}>({pantryCount})</span>}
+                      </button>
+                    )}
+                    <button
+                      className="text-xs font-medium"
+                      style={{ color: SAGE }}
+                      onClick={() => {
+                        setPlan((p) => p ? { ...p, grocery_list: p.grocery_list.map((i) => ({ ...i, checked: false })) } : p)
+                        debouncedSaveChecked([])
+                        const uncheckedCustom = customItems.map((i) => ({ ...i, checked: false }))
+                        setCustomItems(uncheckedCustom)
+                        debouncedSaveCustom(uncheckedCustom)
+                      }}
+                    >
+                      Clear all
+                    </button>
+                  </div>
                 </div>
 
                 {/* Progress */}

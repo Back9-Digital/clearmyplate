@@ -154,6 +154,18 @@ ADULT LUNCH RULES (Mon–Fri only):
 ` : "- No lunches planned."}
 
 ${buildMealPrefsSection(mealPrefs)}${macroSection}
+GROCERY LIST RULES:
+- Do NOT include pantry staples that most families already own and buy in bulk:
+  • Oils: olive oil, vegetable oil, sesame oil, coconut oil, cooking spray
+  • Condiments & sauces: tomato sauce, soy sauce, fish sauce, worcestershire sauce, mayonnaise, mustard, vinegar, hot sauce, sweet chilli sauce, oyster sauce, hoisin sauce, teriyaki sauce
+  • Dry pantry: salt, pepper, sugar, flour, cornflour, baking powder, baking soda, rice (unless a specific variety is central to the meal e.g. arborio), dried pasta (unless a specific shape is central)
+  • Herbs & spices: ALL dried herbs and spices (cumin, paprika, oregano, cinnamon, garlic powder, onion powder, chilli flakes, Italian seasoning, mixed herbs, etc.)
+  • Dairy basics: butter (unless a large specific quantity is needed for the recipe), basic table salt
+  • Stock: stock cubes, chicken/beef/vegetable stock powder or liquid stock (unless a very large quantity is needed)
+- DO include: fresh meat and fish, fresh vegetables, fresh herbs, fresh dairy (milk, cream, fresh cheese like ricotta/feta/mozzarella), canned goods central to the recipe (diced tomatoes, coconut cream, chickpeas etc.), bread, fresh produce, and specific ingredients the family genuinely needs to buy that week.
+- If a recipe genuinely requires a specific sauce or paste that is NOT a common pantry staple (e.g. miso paste, tahini, harissa, gochujang, curry paste), DO include it with the note "(if you don't already have this)" appended to the name.
+- Any item that IS a pantry staple but must be included (e.g. a large or specific amount) must use category "Pantry Staples".
+
 TONE RULES:
 - Never use restrictive or diet-culture language in meal names or descriptions
 - Frame portions as 'satisfying' and 'filling', never 'light' or 'diet'
@@ -190,13 +202,12 @@ Respond with exactly this JSON structure (no markdown, just JSON):
   "grocery_list": [
     {"category": "Proteins", "name": "Chicken thighs", "quantity": "1 kg"},
     {"category": "Produce", "name": "Lemons", "quantity": "3"},
-    {"category": "Pantry", "name": "Olive oil", "quantity": "500 ml"}${planLunch ? `,
-    {"category": "Lunch extras", "name": "Wraps", "quantity": "1 pack"},
-    {"category": "Lunch extras", "name": "Mayonnaise", "quantity": "1 jar"}` : ""}
+    {"category": "Pantry Staples", "name": "Arborio rice", "quantity": "400 g"}${planLunch ? `,
+    {"category": "Lunch extras", "name": "Wraps", "quantity": "1 pack"}` : ""}
   ]
 }
 
-day_of_week: 1=Monday through 7=Sunday. Always include all 7 dinners.${planLunch ? " For lunches: include day_of_week 1–5 only (Mon–Fri). Order meals array: all 7 dinners first, then 5 lunches." : ""} grocery_list categories: Proteins, Produce, Dairy & Eggs, Pantry, Bakery${planLunch ? ", Lunch extras" : ""}.`
+day_of_week: 1=Monday through 7=Sunday. Always include all 7 dinners.${planLunch ? " For lunches: include day_of_week 1–5 only (Mon–Fri). Order meals array: all 7 dinners first, then 5 lunches." : ""} grocery_list categories: Proteins, Produce, Dairy & Eggs, Pantry Staples, Bakery${planLunch ? ", Lunch extras" : ""}. Keep the grocery list lean — only what needs to be bought fresh this week.`
 }
 
 /** Truncate a string to maxLen chars to prevent prompt inflation */

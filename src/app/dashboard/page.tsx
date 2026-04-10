@@ -10,6 +10,7 @@ import { PushNotificationToggle } from "@/components/PushNotificationToggle"
 import { LogoutButton } from "@/components/LogoutButton"
 import { DashboardNavHelp } from "@/components/DashboardNavHelp"
 import { HelpBubble } from "@/components/HelpBubble"
+import { GhlTagSync } from "@/components/GhlTagSync"
 import { createClient } from "@/lib/supabase/server"
 import {
   generationsAllowed,
@@ -95,7 +96,7 @@ export default async function Dashboard() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("plan_type, generations_this_week, week_reset_at, email, full_name, created_at")
+    .select("plan_type, generations_this_week, week_reset_at, email, full_name, created_at, is_beta_tester")
     .eq("id", user.id)
     .single()
 
@@ -115,7 +116,8 @@ export default async function Dashboard() {
     : rawUsed
   const limit      = generationsAllowed(planType)
   const remaining  = generationsRemaining(planType, used)
-  const initial    = (fullName ?? profile?.email ?? user.email ?? "?")[0].toUpperCase()
+  const initial       = (fullName ?? profile?.email ?? user.email ?? "?")[0].toUpperCase()
+  const isBetaTester  = profile?.is_beta_tester ?? false
 
   // Free trial
   const trialDaysLeft    = !isPaid ? trialDaysRemaining(profile?.created_at ?? new Date().toISOString()) : Infinity
@@ -260,6 +262,11 @@ export default async function Dashboard() {
           <div className="flex shrink-0 items-center gap-2 sm:gap-3">
             <PushNotificationToggle />
             <DashboardNavHelp />
+            {isBetaTester && (
+              <span className="hidden sm:inline rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide" style={{ backgroundColor: ACCENT_BG, color: SAGE }}>
+                Beta Tester
+              </span>
+            )}
             <span className="text-sm hidden sm:inline" style={{ color: GRAY }}>{user.email}</span>
             <div
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white"
@@ -430,6 +437,7 @@ export default async function Dashboard() {
           ))}
         </div>
       </main>
+      <GhlTagSync email={user.email!} />
     </div>
   )
 }

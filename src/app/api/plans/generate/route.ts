@@ -80,6 +80,10 @@ function buildPrompt(body: Record<string, unknown>): string {
     family_members, allergies,
   } = body
 
+  const numAdults = Number(adults) || 2
+  const numKids   = Number(kids)   || 0
+  const numBudget = Number(budget) || 200
+
   const mealsArr = Array.isArray(meals)
     ? (meals as unknown[]).filter((m): m is string => typeof m === "string")
     : ["dinner"]
@@ -112,11 +116,11 @@ Include a brief per-meal note if a dish is particularly high or low in any macro
   return `Create a 7-day meal plan for this household.
 
 HOUSEHOLD:
-- Adults: ${adults}, Kids: ${kids}
+- Adults: ${numAdults}, Kids: ${numKids}
 - Eat together: ${meals_together}
 - Meal types: ${planLunch ? "dinner (all 7 days) + leftover-based adult lunch (Mon–Fri)" : "dinner only"}
 - Units: ${units || "metric"}
-- Weekly grocery budget: NZD $${budget || 200}
+- Weekly grocery budget: NZD $${numBudget}
 
 GOAL: ${goal}
 HOUSEHOLD TYPE: ${householdTypes.join(", ")}
@@ -157,9 +161,9 @@ ${buildMealPrefsSection(mealPrefs)}${macroSection}
 PORTION SIZE RULES — THIS IS CRITICAL. READ CAREFULLY:
 ${planLunch
   ? `- Every dinner must produce enough food for BOTH the dinner itself AND a full leftover lunch the next day for all adults.
-- Total servings to cook per dinner = dinner (${adults} adults + ${kids} kids) + next-day adult lunch (${adults} adults) = ${adults * 2 + kids} servings.
+- Total servings to cook per dinner = dinner (${numAdults} adults + ${numKids} kids) + next-day adult lunch (${numAdults} adults) = ${numAdults * 2 + numKids} servings.
 - Key ingredient quantities in the grocery_list MUST reflect this total. Do not halve portions.`
-  : `- Every dinner must feed the full household: ${adults} adults + ${kids} kids = ${adults + kids} servings.`}
+  : `- Every dinner must feed the full household: ${numAdults} adults + ${numKids} kids = ${numAdults + numKids} servings.`}
 - Base portions per person per meal:
   • Meat/fish (as the main protein, e.g. steak, chicken breast, pork chop): Adults 220g raw, Kids 130g raw
   • Meat/fish (mixed into dish, e.g. curry, stew, pasta sauce, stir-fry): Adults 180g raw, Kids 110g raw
@@ -168,17 +172,16 @@ ${planLunch
   • Rice (dry): Adults 90g, Kids 60g
   • Potatoes/kumara (raw): Adults 250g, Kids 160g
 - Apply these per-person numbers and multiply by total servings above.
-- Example for ${adults} adults + ${kids} kids${planLunch ? " with lunches" : ""}: a chicken thigh dinner requires ${planLunch ? `${Math.round(220 * (adults * 2 + kids))}g` : `${Math.round(220 * (adults + kids))}g`} chicken thighs total.
+- Example for ${numAdults} adults + ${numKids} kids${planLunch ? " with lunches" : ""}: a chicken thigh dinner requires ${planLunch ? `${Math.round(220 * (numAdults * 2 + numKids))}g` : `${Math.round(220 * (numAdults + numKids))}g`} chicken thighs total.
 - Always show the TOTAL quantity in the grocery_list (e.g. "1.8 kg chicken thighs"), not per-person amounts.
 - Set portion_notes on each meal to show the per-person breakdown so cooks know how much to plate.
 
 BUDGET VS PROTEIN RULES — HARD CONSTRAINTS:
 ${(() => {
-  const totalPeople = adults + kids
-  // Effective budget threshold — larger households need more protein, so raise thresholds
+  const totalPeople = numAdults + numKids
   const sizeAdj = totalPeople >= 6 ? 100 : totalPeople >= 4 ? 50 : 0
-  const effectiveBudget = (budget as number || 200) + sizeAdj
-  const perMealBudget = Math.round((budget as number || 200) / 7)
+  const effectiveBudget = numBudget + sizeAdj
+  const perMealBudget = Math.round(numBudget / 7)
   const maxProteinPerMeal = Math.round(perMealBudget * 0.40)
 
   let tierRules: string
@@ -192,7 +195,7 @@ ${(() => {
     tierRules = "Budget $300+ (adjusted for household size): free range across all tiers, but still prioritise value and variety."
   }
 
-  return `- Weekly budget: NZD $${budget || 200}. Total people: ${totalPeople}. Per-meal budget: ~$${perMealBudget}. Max protein spend per meal: ~$${maxProteinPerMeal}.
+  return `- Weekly budget: NZD $${numBudget}. Total people: ${totalPeople}. Per-meal budget: ~$${perMealBudget}. Max protein spend per meal: ~$${maxProteinPerMeal}.
 - ${tierRules}
 - NZ supermarket protein cost tiers (approximate per kg):
   • Budget ($10-18/kg): chicken thighs, chicken drumsticks, beef mince, pork mince, canned tuna, eggs, lentils, chickpeas
@@ -200,7 +203,7 @@ ${(() => {
   • Premium ($28-45/kg): beef steak (all cuts), lamb chops, lamb roast, beef roast, salmon fillet, prawns
   • Very premium ($45+/kg): eye fillet, rack of lamb, whole salmon — NEVER on budgets under $300
 - Before finalising each meal, calculate: (protein kg needed × cost per kg). If protein cost alone exceeds 35% of the weekly budget, choose a different protein.
-- Practical check: ${totalPeople} people × 200g = ${(totalPeople * 200 / 1000).toFixed(1)}kg protein per meal. At $32/kg for steak that is $${Math.round(totalPeople * 200 / 1000 * 32)} per meal on protein alone. On a $${budget || 200} weekly budget, that is ${Math.round((totalPeople * 200 / 1000 * 32) / (budget as number || 200) * 100)}% of the weekly budget on one meal's protein — if over 25%, choose a more affordable protein.
+- Practical check: ${totalPeople} people × 200g = ${(totalPeople * 200 / 1000).toFixed(1)}kg protein per meal. At $32/kg for steak that is $${Math.round(totalPeople * 200 / 1000 * 32)} per meal on protein alone. On a $${numBudget} weekly budget, that is ${Math.round(totalPeople * 200 / 1000 * 32 / numBudget * 100)}% of the weekly budget on one meal's protein — if over 25%, choose a more affordable protein.
 - When budget is tight: prioritise flavourful budget proteins done well (slow-cooked chicken thighs, beef mince ragu, pork belly braise, sausage tray bake) over cheap versions of premium cuts done poorly.`
 })()}
 

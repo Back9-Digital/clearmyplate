@@ -7,12 +7,12 @@
 // - object-src 'none': blocks Flash and other plugins
 const CSP = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://leads-api.back9.co.nz",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-  "img-src 'self' data: blob:",
+  "img-src 'self' data: blob: https://leads-api.back9.co.nz",
   "font-src 'self' https://fonts.gstatic.com",
-  `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.anthropic.com`,
-  "frame-src 'none'",
+  `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.anthropic.com https://leads-api.back9.co.nz`,
+  "frame-src https://leads-api.back9.co.nz",
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self' https://*.supabase.co",

@@ -8,6 +8,8 @@ import { DollarSign, UtensilsCrossed, Target, ArrowRight, Zap, Users } from "luc
 import { PaymentSuccessBanner } from "@/components/PaymentSuccessBanner"
 import { PushNotificationToggle } from "@/components/PushNotificationToggle"
 import { LogoutButton } from "@/components/LogoutButton"
+import { DashboardNavHelp } from "@/components/DashboardNavHelp"
+import { HelpBubble } from "@/components/HelpBubble"
 import { createClient } from "@/lib/supabase/server"
 import {
   generationsAllowed,
@@ -242,6 +244,7 @@ export default async function Dashboard() {
             ))}
           </div>
         </main>
+        <HelpBubble />
       </div>
     )
   }
@@ -256,6 +259,7 @@ export default async function Dashboard() {
           <img src="/images/Clear My Plate Logo Horizontal Lockup.svg" alt="ClearMyPlate" className="h-8 w-auto shrink-0 sm:h-10" />
           <div className="flex shrink-0 items-center gap-2 sm:gap-3">
             <PushNotificationToggle />
+            <DashboardNavHelp />
             <span className="text-sm hidden sm:inline" style={{ color: GRAY }}>{user.email}</span>
             <div
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white"

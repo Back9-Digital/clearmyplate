@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import { ArrowLeft, Plus, Minus, Check, Save, ExternalLink, Mail, UserPlus, X as XIcon } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { HelpBubble } from "@/components/HelpBubble"
 import {
   generationsAllowed,
   generationsRemaining,
@@ -1088,6 +1089,7 @@ export default function SettingsPage() {
           )}
         </div>
       </main>
+      <HelpBubble />
     </div>
   )
 }

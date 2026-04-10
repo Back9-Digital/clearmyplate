@@ -9,7 +9,7 @@ const CSP = [
   "default-src 'self'",
   "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://leads-api.back9.co.nz",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-  "img-src 'self' data: blob: https://leads-api.back9.co.nz",
+  "img-src 'self' data: blob: https://leads-api.back9.co.nz https://assets.cdn.filesafe.space",
   "font-src 'self' https://fonts.gstatic.com",
   `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.anthropic.com https://leads-api.back9.co.nz`,
   "frame-src https://leads-api.back9.co.nz",

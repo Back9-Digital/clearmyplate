@@ -34,6 +34,14 @@ const securityHeaders = [
 ]
 
 const nextConfig = {
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "assets.cdn.filesafe.space",
+      },
+    ],
+  },
   async headers() {
     return [
       {

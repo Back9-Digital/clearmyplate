@@ -78,9 +78,9 @@ export default function BetaTestingGuidePage() {
         <div className="mb-10 text-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="https://assets.cdn.filesafe.space/2BecwcueTQNQ4jcrRUnS/media/69d6d547a5d3efc6dee95f66.svg"
+            src="https://assets.cdn.filesafe.space/2BecwcueTQNQ4jcrRUnS/media/69d6d65aebf1a608434ba0f3.png"
             alt="ClearMyPlate"
-            style={{ width: 180 }}
+            style={{ width: 200 }}
             className="mx-auto mb-6"
           />
           <span
